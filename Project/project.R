@@ -2,6 +2,9 @@
 #JEAN-SEBASTIEN PAUL
 #EXPLORING COVID-19 DEATHRATES
 
+#NOTES:
+#Correlation heatmap code from:
+#http://www.sthda.com/english/wiki/ggplot2-quick-correlation-matrix-heatmap-r-software-and-data-visualization
 
 
 #PACKAGES:
@@ -22,7 +25,12 @@ library(tidyverse)
 library(chron)
 #install.packages("expss")
 library(expss)
-
+#install("ggplot2")
+library(ggplot2)
+#install.packages("reshape2")
+library(reshape2)
+#install.packages("stats4")
+library(stats4)
 
 
 #SETTING SEED FOR CONSISTENT RESULTS
@@ -105,7 +113,7 @@ dccum = function(datain){
   return(data)
 }
 
-#data2Setup
+#data2Setup:
 #Sets up data2 once predictors, testing and geographicdata
 #combined. Also for use when reading data in as a .csv
 data2Setup = function(data){
@@ -132,13 +140,32 @@ dateCol = function(data){
   return(data)
 }
 
-#ChiSq
+#ChiSq:
 #Returns chi squared value
 ChiSq <-function(Obs,Exp){
   sum((Obs-Exp)^2/Exp)
 }
 
+#get_upper_tri:
+#Get upper triangle of the correlation matrix
+get_upper_tri <- function(cormat){
+  cormat[lower.tri(cormat)]<- NA
+  return(cormat)
+}
 
+#%.%:
+#Dot product function
+"%.%" <- function(x,y) sum(x*y) #dot product function
+
+#linearm:
+#Performs linear regression
+linearm = function(predictors,dependent){
+  v1=rep(1,nrow(predictors))
+  A <- cbind(v1,predictors)
+  B <- t(A)%*%A; B
+  P <- A%*%solve(B)%*%t(A)
+  return(solve(B)%*%t(A)%*%dependent)
+}
 
 #DATA SCRAPING
 #NOTE: A CSV file has also been provided. This is here if you
@@ -151,47 +178,45 @@ ChiSq <-function(Obs,Exp){
 #of those predictors and rows with NA values being dropped
 
 
-#Get data from internet
-JHURecovs=read.csv("https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_recovered_global.csv")
-predictors=read.csv("https://raw.githubusercontent.com/jspaul2003/nCoV2019/master/more_data/covid19_by_country.csv")
-testing=read.csv("https://raw.githubusercontent.com/jspaul2003/nCoV2019/master/testing.csv")
-GET("https://opendata.ecdc.europa.eu/covid19/casedistribution/csv", authenticate(":", ":", type="ntlm"), write_disk(tf <- tempfile(fileext = ".csv")))
-geographicdata=read.csv(tf)
+# #Get data from internet
+# JHURecovs=read.csv("https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_recovered_global.csv")
+# predictors=read.csv("https://raw.githubusercontent.com/jspaul2003/nCoV2019/master/more_data/covid19_by_country.csv")
+# testing=read.csv("https://raw.githubusercontent.com/jspaul2003/nCoV2019/master/testing.csv")
+# GET("https://opendata.ecdc.europa.eu/covid19/casedistribution/csv", authenticate(":", ":", type="ntlm"), write_disk(tf <- tempfile(fileext = ".csv")))
+# geographicdata=read.csv(tf)
+# 
+# #Formatting this data
+# JHURecovs1=formatJHU(JHURecovs,"recoveries")
+# predictors$countriesAndTerritories=predictors$Country
+# testing$countriesAndTerritories=testing$Entity
+# testing$Date=as.Date(testing$Date, format= "%b %d, %y")
+# geographicdata=dateCol(geographicdata)
+# geographicdata=geographicdata%>%right_join(JHURecovs1, by=c("countriesAndTerritories","Date"))
+# geographicdata=drop_na(geographicdata)
+# 
+# #Making Our Big Datasets
+# #(REQ: A dataframe, At least 2 numeric columns, A data set with lots of columns, 
+# #allowing comparison of many different variables.)
+# geographicdata$days=geographicdata$Date-geographicdata$Date[which.min(geographicdata$Date)]
+# 
+# #determine cumulative deaths and cases for geographic data-> use this
+# #to find active cases, deathrate
+# geographicdata=dccum(geographicdata)
+# geographicdata$active=geographicdata$cases2-geographicdata$deaths2-geographicdata$recoveries
+# geographicdata$deathrate=geographicdata$deaths2/(geographicdata$cases2+1*(geographicdata$cases2==0))
+# 
+# 
+# data2=geographicdata %>% inner_join(testing, by=c("countriesAndTerritories","Date"))
+# data2=predictors %>% right_join(data2, by=c("countriesAndTerritories"))
+# data2 <- subset(data2, select = -c(Tests, Test.Pop,Quarantine,Schools,Restrictions,Total.Recovered,Total.Deaths,Total.Infected,popData2018))
+# data2=data2Setup(data2)
 
-#Formatting this data
-JHURecovs1=formatJHU(JHURecovs,"recoveries")
-predictors$countriesAndTerritories=predictors$Country
-testing$countriesAndTerritories=testing$Entity
-testing$Date=as.Date(testing$Date, format= "%b %d, %y")
-geographicdata=dateCol(geographicdata)
-geographicdata=geographicdata%>%right_join(JHURecovs1, by=c("countriesAndTerritories","Date"))
-geographicdata=drop_na(geographicdata)
+#READ FROM CSV (ALTERNATIVE TO DATASCRAPING)
 
-#Making Our Big Datasets
-#(REQ: A dataframe, At least 2 numeric columns, A data set with lots of columns, 
-#allowing comparison of many different variables.)
-geographicdata$days=geographicdata$Date-geographicdata$Date[which.min(geographicdata$Date)]
-
-#determine cumulative deaths and cases for geographic data-> use this
-#to find active cases, deathrate
-geographicdata=dccum(geographicdata)
-geographicdata$active=geographicdata$cases2-geographicdata$deaths2-geographicdata$recoveries
-geographicdata$deathrate=geographicdata$deaths2/(geographicdata$cases2+1*(geographicdata$cases2==0))
-
-
-data2=geographicdata %>% inner_join(testing, by=c("countriesAndTerritories","Date"))
-data2=predictors %>% right_join(data2, by=c("countriesAndTerritories"))
-data2 <- subset(data2, select = -c(Tests, Test.Pop,Quarantine,Schools,Restrictions,Total.Recovered,Total.Deaths,Total.Infected,popData2018))
-data2=data2Setup(data2)
-
-#READ FROM CSV ALTERNATIVE (TO DATASCRAPING)
-#Note that REQs of dataframes are all specified above in the datascraping 
-#code comments
-
-#data=read.csv("data.csv")
-#data=dateCol(data)
-#geographicdata=data[,which(colnames(data)=="countriesAndTerritories"):ncol(data)]
-#data2=data2Setup(data)
+data=read.csv("data.csv")
+data=dateCol(data)
+geographicdata=data[,which(colnames(data)=="countriesAndTerritories"):ncol(data)]
+data2=data2Setup(data)
 #(REQ: A dataframe, At least 2 numeric columns, A data set with lots of columns, 
 #allowing comparison of many different variables.)
 
@@ -248,7 +273,7 @@ hist(geographicdata$deathrate[which(geographicdata$deaths2!=0)],prob=T,breaks="f
 curve( dgamma(x,0.45,13)    ,add=T,col="red")
 #Seems relatively well approximated
 
-#Lets test if we can indeed model with a gamma function
+#Lets test if we can indeed model this with a gamma function
 
 #create bins by breaking data into deciles
 bins=qgamma(0.1*(1:10),0.45,13)
@@ -264,8 +289,6 @@ chisq=sum((obs-exp)^2/exp); chisq
 #lose 3 dfs to get 7dfs
 
 pval=pchisq(chisq,df=7,lower.tail = F); pval
-
-
 
 
 
@@ -331,26 +354,54 @@ Observed=table(data2$hdr,data2$Crime)
 Expected <- outer(rowSums(Observed), colSums(Observed))/sum(Observed)
 chisq <- sum((Observed - Expected)^2/Expected); chisq
 pval= 1 - pchisq(chisq,1); pval
-#We strongly reject null hypothosis of independence at the 0.05 level of significance, with a 
-#P-value of 3.116538e-09, much less than 0.05.
+#We strongly reject null hypothosis of independence at the 0.05 level of 
+#significance, with a P-value of 3.116538e-09, much less than 0.05.
 #This looks promising for modelling later on.
 
 
+#III)
+#Exploring Correlation with all our other data variables
+#We will carry this out using a correlation heatmap
+#(REQ: A graphical display different from those in the textbook 
+#or in the class scripts, Appropriate use of correlation)
+
+#extract numeric columns, ensure everything is numeric
+temp <- subset(data2, select = -c(Country,countriesAndTerritories, geoId, countryterritoryCode, continentExp, Date, day, month, year, hdr, Entity, Code, dateRep))
+sapply(temp, is.numeric)
+temp$days=as.numeric(temp$days)
+
+cormat <- round(cor(temp),2)
 
 
+# Melt the correlation matrix
+upper_tri <- get_upper_tri(cormat)
+melted_cormat <- melt(upper_tri, na.rm = TRUE)
+# Heatmap
+ggplot(data = melted_cormat, aes(Var2, Var1, fill = value))+
+  geom_tile(color = "white")+
+  scale_fill_gradient2(low = "blue", high = "red", mid = "white", 
+                       midpoint = 0, limit = c(-1,1), space = "Lab", 
+                       name="Pearson\nCorrelation") +
+  theme_minimal()+ 
+  theme(axis.text.x = element_text(angle = 90, vjust = 1, 
+                                   size = 10, hjust = 1))+
+  coord_fixed()
+
+#Death rate actually isnt strongly correlated with much at all, 
+#with the other variables. Interestingly, we dont see high degrees of 
+#similarity. Perhaps this indicates that deathrate is relatively constant.
 
 
+#PART 3:
+#Modelling deathrate and deathtoll.
 
+#I)
+#Modelling deathrate via logistic regression.
+#lets train on a random sample of 30% of the data
+#and then test on the rest of the sample.
+#then we can compare fitted R^2 to determine best model
 
-
-
-
-
-
-
-
-
-
+fit=glm(    ,family="binomial")
 
 
 
