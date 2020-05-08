@@ -3,7 +3,7 @@
 #EXPLORING COVID-19 DEATHRATES
 
 #NOTES:
-#Correlation heatmap code from:
+#Correlation heatmap code learnt from:
 #http://www.sthda.com/english/wiki/ggplot2-quick-correlation-matrix-heatmap-r-software-and-data-visualization
 
 
@@ -170,6 +170,23 @@ linearm = function(predictors,dependent){
   return(solve(B)%*%t(A)%*%dependent)
 }
 
+#ggbar:
+#Returns a ggplot which would plot a side by side barplot
+#of the 2 inputted vectors, deaths and model. X axis noted 
+#as days.
+ggbar = function(a,b){
+  df=as.data.frame(cbind(a,b))
+  df$days=seq(1:nrow(df))
+  colnames(df)[1]="Real Total Deaths"
+  colnames(df)[2]="Model"
+  df = melt(df, id.vars=c("days"))
+  
+  return(ggplot(df, aes(days, value, fill=variable)) 
+         + geom_bar(stat='Identity',position=position_dodge())
+         +ggtitle("Modelling the time series data for total COVID-19 deaths"))
+}
+
+
 #DATA SCRAPING
 #NOTE: A CSV file has also been provided. This is here if you
 #are at all interested at how I collected and formatted that data
@@ -239,24 +256,25 @@ nrow(data2)
 
 #I)
 #Can we model the time series data of new deaths world wide as binomial distribution?
-#We will look at the interval between days 0 to 102. We will use the more in depth 
+#We will look at the interval between days 1 to 106. We will use the more in depth 
 #in deathrate, geographicdata dataframe. It will contain over 50 countries.
-#(REQ: A barplot)
+#(REQ: A barplot,Nicely labeled graphics using ggplot, with good use of color, line 
+#styles...)
 
 #max days
 max(geographicdata$days)
 
-world=geographicdata[0:max(geographicdata$days),]
-world$deathrate=0
+world=geographicdata[1:max(geographicdata$days),]
+world$deathrate=1
 
-a=subset(geographicdata,geographicdata$days==0)
+a=subset(geographicdata,geographicdata$days==1)
 logic=geographicdata$days==max(geographicdata$days)&geographicdata$countriesAndTerritories%in%a$countriesAndTerritories
 a=subset(geographicdata,logic)
 
-#number of countries at days 0 and last day
+#number of countries at days 1 and last day
 nrow(a)
 
-for(i in 0:(max(geographicdata$days))){
+for(i in 1:(max(geographicdata$days))){
   index=which(geographicdata$days==i&(geographicdata$countriesAndTerritories%in%a$countriesAndTerritories))
   index2=which(geographicdata$days==i)
   
@@ -270,29 +288,37 @@ for(i in 0:(max(geographicdata$days))){
   world$cases[i]=sum(geographicdata$cases[index])
   world$active[i]=sum(geographicdata$active[index])
 }
+world$days=as.numeric(world$days)
 
 #Could we plot a binomial distribution for deaths
-barplot(rbind((world$deaths2),world$active*0.19*pbinom(1:nrow(world),(round(world$active/1000)),mean(world$deathrate))), beside = TRUE, col = c("red", "blue")) 
+model=world$active*0.17*pbinom(1:nrow(world),(round(world$active/1000)),mean(world$deathrate))
+ggbar(world$deaths2,model)+xlab("Days since 2020-01-22")+ylab("Total COVID-19 Deaths")
+
 #Seems like a very weak model.
 
 #How about a poisson model?
 fitdistr(world$deaths2, "poisson")
-barplot(rbind((world$deaths2),world$active*0.19*ppois(1:nrow(world), 17.83948)), beside = TRUE, col = c("red", "blue")) 
-#Seems like just as weak as the binomial model.
+model=world$active*0.17*ppois(1:nrow(world), 17.83948)
+ggbar(world$deaths2,model)+xlab("Days since 2020-01-22")+ylab("Total COVID-19 Deaths")
+
+#Seems just as weak as the binomial model.
 
 #II)
 #How are death rates distributed: do they converge at a certain value or do they vary wildly?
 #(REQ: A histogram, A probability density function overlaid on a histogram, A p-value or other
 #statistic based on a distribution function, Appropriate use of R functions for a probability 
-#distribution other than binomial, normal, or chi-square.)
+#distribution other than binomial, normal, or chi-square, Nicely labeled graphics using ggplot, 
+#with good use of color, line styles...)
 
-hist(geographicdata$deathrate[which(geographicdata$deaths2!=0)],prob=T,breaks=500)
+toplot=subset(geographicdata, deaths2!=0)
+p=ggplot(toplot, aes(x=deathrate))  +
+       geom_histogram(aes(y=..density..), binwidth=0.01, colour="steelblue", fill="white",bins="fd") +
+      ylab("Density")+xlab("Death Rate")+ggtitle("Density Histogram of death rate")
+p
 
 #Lets try modelling with a gamma function
 fitdistr(geographicdata$deathrate[which(geographicdata$deaths2!=0)], "gamma")
-hist(geographicdata$deathrate[which(geographicdata$deaths2!=0)],prob=T,breaks="fd")
-curve( dgamma(x,1.06011822 ,21.99330112)    ,add=T,col="red")
-
+p+stat_function(fun=dgamma, args=list(shape=1.06011822, rate=21.99330112),col="red")+xlim(0,1)
 #Seems good
 
 #Lets test if we can indeed model this with a gamma function
@@ -329,7 +355,8 @@ pval=pchisq(chisq,df=7,lower.tail = F); pval
 #Is there a significant difference in death rates between rich countries 
 #and poor countries?
 #We will check via a permutation test
-#(REQ: A permutation test)
+#(REQ: A permutation test, Nicely labeled graphics using ggplot, with good 
+#use of color, line styles...)
 
 #we will look only at the latest data from the latest date
 data2$Date[which.max(data2$Date)]
@@ -348,8 +375,15 @@ for(i in 1:N){
   drother=mean(temp$deathrate[-samp])
   diff[i]=drsamp-drother
 }
-hist(diff,breaks=100, col=rgb(0,0.62,0.107,1))
-abline(v=deathRateDif,col="blue") 
+
+p=ggplot() + 
+  aes(diff)+ 
+  geom_histogram(binwidth=0.001,bins=100, colour=rgb(0,0.8,0.107,1), fill=rgb(0,0.62,0.107,1))+
+  ylab("Count")+
+  xlab("Differences in death rates between rich and poor countries")+
+  ggtitle("Histogram of differences in death rates between rich and poor countries")
+
+p+geom_vline(xintercept =deathRateDif,col="blue")
 
 #Does not look significant, reaffirming what we thought before
 
@@ -414,6 +448,7 @@ ggplot(data = melted_cormat, aes(Var2, Var1, fill = value))+
   theme_minimal()+ 
   theme(axis.text.x = element_text(angle = 90, vjust = 1, 
                                    size = 10, hjust = 1))+
+  xlab("")+ylab("")+ggtitle("Correlation heatmap for COVID-19 data")
   coord_fixed()
 
 #Death rate actually isnt strongly correlated with much at all, 

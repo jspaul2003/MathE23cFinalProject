@@ -1,8 +1,10 @@
 # MathE23cFinalProject
 TO DO:
+
 Linear Model
+
 Logistic Model
 
-ggplots
+Write up
 
 quarantine logic variable?
