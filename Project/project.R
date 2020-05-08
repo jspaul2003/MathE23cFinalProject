@@ -235,26 +235,38 @@ nrow(data2)
 
 #I)
 #Can we model the time series data of new deaths world wide as binomial distribution?
-#We will look at the interval between days 1 to 122. We will use the more in depth 
-#in deathratel, geographicdata dataframe. It will contain 67 countries always having data 
-#between 1 to 122.
+#We will look at the interval between days 0 to 102. We will use the more in depth 
+#in deathrate, geographicdata dataframe. It will contain over 50 countries.
 #(REQ: A barplot)
 
-world=geographicdata[c(seq(1:max(geographicdata$days)),max(geographicdata$days)),]
+#max days
+max(geographicdata$days)
+
+world=geographicdata[0:max(geographicdata$days),]
 world$deathrate=0
-a=geographicdata[which(geographicdata$days==5),]
-a=geographicdata[which(geographicdata$days==max(geographicdata$days)&geographicdata$countriesAndTerritories%in%a$countriesAndTerritories),]
-for(i in 1:(max(data2$days))){
-  world$Date[i]=i+min(geographicdata2$Date)
+
+a=subset(geographicdata,geographicdata$days==0)
+logic=geographicdata$days==max(geographicdata$days)&geographicdata$countriesAndTerritories%in%a$countriesAndTerritories
+a=subset(geographicdata,logic)
+
+#number of countries at days 0 and last day
+nrow(a)
+
+for(i in 0:(max(geographicdata$days))){
+  index=which(geographicdata$days==i&(geographicdata$countriesAndTerritories%in%a$countriesAndTerritories))
+  index2=which(geographicdata$days==i)
+  
+  world$Date[i]=i+min(geographicdata$Date)
   world$days[i]=i
   
-  world$deathrate[i]=sum(geographicdata$deaths2[which(geographicdata$days==i)])/(sum(geographicdata$cases2[which(geographicdata$days==i)])+1*(sum(geographicdata$cases2[which(geographicdata$days==i)])==0))
-  world$deaths2[i]=sum(geographicdata$deaths2[which(geographicdata$days==i&(geographicdata$countriesAndTerritories%in%a$countriesAndTerritories))])
-  world$cases2[i]=sum(geographicdata$cases2[which(geographicdata$days==i&(geographicdata$countriesAndTerritories%in%a$countriesAndTerritories))])
-  world$deaths[i]=sum(geographicdata$deaths[which(geographicdata$days==i&(geographicdata$countriesAndTerritories%in%a$countriesAndTerritories))])
-  world$cases[i]=sum(geographicdata$cases[which(geographicdata$days==i&(geographicdata$countriesAndTerritories%in%a$countriesAndTerritories))])
-  world$active[i]=sum(geographicdata$active[which(geographicdata$days==i&(geographicdata$countriesAndTerritories%in%a$countriesAndTerritories))])
+  world$deathrate[i]=sum(geographicdata$deaths2[index2])/(sum(geographicdata$cases2[index2])+1*(sum(geographicdata$cases2[index2])==0))
+  world$deaths2[i]=sum(geographicdata$deaths2[index])
+  world$cases2[i]=sum(geographicdata$cases2[index])
+  world$deaths[i]=sum(geographicdata$deaths[index])
+  world$cases[i]=sum(geographicdata$cases[index])
+  world$active[i]=sum(geographicdata$active[index])
 }
+
 world$dr2=world$deaths/world$active
 world=world[1:(nrow(world)-2),]
 
