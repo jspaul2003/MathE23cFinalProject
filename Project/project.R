@@ -31,7 +31,8 @@ library(ggplot2)
 library(reshape2)
 #install.packages("stats4")
 library(stats4)
-
+#install.package("fitdistrplus")
+library(fitdistrplus)
 
 #SETTING SEED FOR CONSISTENT RESULTS
 set.seed(3.141592)
@@ -155,7 +156,7 @@ get_upper_tri <- function(cormat){
 
 #%.%:
 #Dot product function
-"%.%" <- function(x,y) sum(x*y) #dot product function
+"%.%" <- function(x,y) sum(x*y)
 
 #linearm:
 #Performs linear regression
@@ -195,7 +196,7 @@ linearm = function(predictors,dependent){
 # geographicdata=drop_na(geographicdata)
 # 
 # #Making Our Big Datasets
-# #(REQ: A dataframe, At least 2 numeric columns, A data set with lots of columns, 
+# #(REQ: A dataframe, At least 2 numeric columns, A data set with lots of columns,
 # #allowing comparison of many different variables.)
 # geographicdata$days=geographicdata$Date-geographicdata$Date[which.min(geographicdata$Date)]
 # 
@@ -216,6 +217,7 @@ linearm = function(predictors,dependent){
 data=read.csv("data.csv")
 data=dateCol(data)
 geographicdata=data[,which(colnames(data)=="countriesAndTerritories"):ncol(data)]
+geographicdata$days=geographicdata$Date-geographicdata$Date[which.min(geographicdata$Date)]
 data2=data2Setup(data)
 #(REQ: A dataframe, At least 2 numeric columns, A data set with lots of columns, 
 #allowing comparison of many different variables.)
@@ -240,7 +242,7 @@ nrow(data2)
 
 world=geographicdata[c(seq(1:max(geographicdata$days)),max(geographicdata$days)),]
 world$deathrate=0
-a=geographicdata[which(geographicdata$days==1),]
+a=geographicdata[which(geographicdata$days==5),]
 a=geographicdata[which(geographicdata$days==max(geographicdata$days)&geographicdata$countriesAndTerritories%in%a$countriesAndTerritories),]
 for(i in 1:(max(data2$days))){
   world$Date[i]=i+min(geographicdata2$Date)
@@ -253,13 +255,16 @@ for(i in 1:(max(data2$days))){
   world$cases[i]=sum(geographicdata$cases[which(geographicdata$days==i&(geographicdata$countriesAndTerritories%in%a$countriesAndTerritories))])
   world$active[i]=sum(geographicdata$active[which(geographicdata$days==i&(geographicdata$countriesAndTerritories%in%a$countriesAndTerritories))])
 }
+world$dr2=world$deaths/world$active
+world=world[1:(nrow(world)-2),]
 
 #Could we plot a binomial distribution for deaths
-world$dr2=world$deaths/world$active
-barplot(rbind((world$deaths2),world$active/6*pbinom(1:nrow(world),(round(world$active/1000)),mean(world$deathrate))), beside = TRUE, col = c("red", "blue")) #no
-
+barplot(rbind((world$deaths2),world$active*0.18*pbinom(1:nrow(world),(round(world$active/1000)),mean(world$deathrate))), beside = TRUE, col = c("red", "blue")) #no
 #Seems like a very weak model.
 
+#How about a poisson model?
+fitdistr(geographicdata$world$deaths2, "poisson")
+plot
 
 #II)
 #How are death rates distributed: do they converge at a certain value or do they vary wildly?
@@ -267,18 +272,24 @@ barplot(rbind((world$deaths2),world$active/6*pbinom(1:nrow(world),(round(world$a
 #statistic based on a distribution function, Appropriate use of R functions for a probability 
 #distribution other than binomial, normal, or chi-square.)
 
-hist(geographicdata$deathrate[which(geographicdata$deaths2!=0)],prob=T,breaks="fd")
+hist(geographicdata$deathrate[which(geographicdata$deaths2!=0)],prob=T,breaks=500)
 
 #Lets try modelling with a gamma function
-curve( dgamma(x,0.45,13)    ,add=T,col="red")
+fitdistr(geographicdata$deathrate[which(geographicdata$deaths2!=0)], "gamma")
+hist(geographicdata$deathrate[which(geographicdata$deaths2!=0)],prob=T,breaks="fd")
+curve( dgamma(x,1.32888200 ,42.14284222)    ,add=T,col="red")
 #Seems relatively well approximated
 
 #Lets test if we can indeed model this with a gamma function
 
+
 #create bins by breaking data into deciles
-bins=qgamma(0.1*(1:10),0.45,13)
+bins=qgamma(0.1*(0:10),1.32888200 ,42.14284222)
 
 binstuff=cut(geographicdata$deathrate[which(geographicdata$deaths2!=0)], breaks=bins,labels=F); binstuff
+
+
+
 obs=as.vector(table(binstuff))
 
 exp=rep(sum(obs)/10,10)
@@ -289,6 +300,9 @@ chisq=sum((obs-exp)^2/exp); chisq
 #lose 3 dfs to get 7dfs
 
 pval=pchisq(chisq,df=7,lower.tail = F); pval
+
+#strongly reject null hypothesis
+#
 
 
 
@@ -401,8 +415,12 @@ ggplot(data = melted_cormat, aes(Var2, Var1, fill = value))+
 #and then test on the rest of the sample.
 #then we can compare fitted R^2 to determine best model
 
-fit=glm(    ,family="binomial")
+temp <- subset(data2, select = -c(Country,countriesAndTerritories, geoId, countryterritoryCode, continentExp, Date, day, month, year, hdr, Entity, Code, dateRep))
 
+
+fit=step(glm(deathrate~.^2,data=temp,family="binomial"))
+
+lm
 
 
 
