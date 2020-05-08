@@ -292,7 +292,8 @@ hist(geographicdata$deathrate[which(geographicdata$deaths2!=0)],prob=T,breaks=50
 fitdistr(geographicdata$deathrate[which(geographicdata$deaths2!=0)], "gamma")
 hist(geographicdata$deathrate[which(geographicdata$deaths2!=0)],prob=T,breaks="fd")
 curve( dgamma(x,1.06011822 ,21.99330112)    ,add=T,col="red")
-#Seems relatively well approximated
+
+#Seems good
 
 #Lets test if we can indeed model this with a gamma function
 
@@ -302,12 +303,10 @@ bins=qgamma(0.1*(0:10),1.06011822 ,21.99330112)
 
 binstuff=cut(geographicdata$deathrate[which(geographicdata$deaths2!=0)], breaks=bins,labels=F); binstuff
 
-
-
 obs=as.vector(table(binstuff))
 
 exp=rep(sum(obs)/10,10)
-chisq=sum((obs-exp)^2/exp); chisq
+chisq=ChiSq(obs,exp); chisq
 
 #P-value
 #10 Categories, imposed 2 parameters, set total of actual and expected equal. Therefore we
@@ -315,9 +314,11 @@ chisq=sum((obs-exp)^2/exp); chisq
 
 pval=pchisq(chisq,df=7,lower.tail = F); pval
 
-#We strongly reject null hypothesis, with p value 1.651946e-37 well below 0.05 significance
-#level, of no significant difference. We thus conclude under the given evidence that this 
-#distribution is not followed.
+#We got a p-value of 1.651946e-37. It is thus extremely improbably that we observe a test 
+#statistic this extreme from the relevant chi square distribution, so under the current 
+#evidence we strongly reject the null hypothesis at the 0.05 level of significance that the 
+#data follows a gamma distribution.
+
 
 #PART 2:
 #Exploring Correlations and Independences within our dataframes to Deathrate
@@ -379,18 +380,19 @@ cro(data2$hdr,data2$Crime)
 #Run Chi-square test
 Observed=table(data2$hdr,data2$Crime)
 Expected <- outer(rowSums(Observed), colSums(Observed))/sum(Observed)
-chisq <- sum((Observed - Expected)^2/Expected); chisq
+chisq <- ChiSq(Observed,Expected); chisq
 pval= 1 - pchisq(chisq,1); pval
 #We strongly reject null hypothosis of independence at the 0.05 level of 
-#significance, with a P-value of 3.116538e-09, much less than 0.05.
-#This looks promising for modelling later on.
+#significance, with a P-value so small that the computer rounded it to 0, 
+#(much less than 0.05). This looks promising for modelling later on.
 
 
 #III)
 #Exploring Correlation with all our other data variables
 #We will carry this out using a correlation heatmap
 #(REQ: A graphical display different from those in the textbook 
-#or in the class scripts, Appropriate use of correlation)
+#or in the class scripts, Appropriate use of correlation, Nicely labeled 
+#graphics using ggplot, with good use of color, line styles...)
 
 #extract numeric columns, ensure everything is numeric
 temp <- subset(data2, select = -c(Country,countriesAndTerritories, geoId, countryterritoryCode, continentExp, Date, day, month, year, hdr, Entity, Code, dateRep))
