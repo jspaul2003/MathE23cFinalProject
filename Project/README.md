@@ -1,5 +1,8 @@
 # MathE23cFinalProject
-#TO DO:
-#Fix reading CSV option
-#Linear Model
-#Logistic Model
+TO DO:
+Linear Model
+Logistic Model
+
+ggplots
+
+quarantine logic variable?

@@ -118,6 +118,8 @@ dccum = function(datain){
 #Sets up data2 once predictors, testing and geographicdata
 #combined. Also for use when reading data in as a .csv
 data2Setup = function(data){
+  data <- subset(data, select = -c(Tests, Test.Pop,Quarantine,Schools,Restrictions,Total.Recovered,Total.Deaths,Total.Infected,popData2018))
+  
   #(lose rows with NA Values in data)
   data2=drop_na(data)
   data2$days=data2$Date-data2$Date[which.min(data2$Date)]
@@ -209,20 +211,22 @@ linearm = function(predictors,dependent){
 # 
 # data2=geographicdata %>% inner_join(testing, by=c("countriesAndTerritories","Date"))
 # data2=predictors %>% right_join(data2, by=c("countriesAndTerritories"))
-# data2 <- subset(data2, select = -c(Tests, Test.Pop,Quarantine,Schools,Restrictions,Total.Recovered,Total.Deaths,Total.Infected,popData2018))
 # data2=data2Setup(data2)
 
 #READ FROM CSV (ALTERNATIVE TO DATASCRAPING)
+#(REQ: A dataframe, At least 2 numeric columns, A data set with lots of columns, 
+#allowing comparison of many different variables.)
 
 data=read.csv("data.csv")
 data=dateCol(data)
 geographicdata=data[,which(colnames(data)=="countriesAndTerritories"):ncol(data)]
 geographicdata$days=geographicdata$Date-geographicdata$Date[which.min(geographicdata$Date)]
+geographicdata <- subset(geographicdata, select = -c(Entity, Code, Total.tests))
 data2=data2Setup(data)
-#(REQ: A dataframe, At least 2 numeric columns, A data set with lots of columns, 
-#allowing comparison of many different variables.)
 
-#(REQ: At least 20 rows)
+#(REQ: At least 20 rows, A data set so large it can be used as a population from 
+#which samples are taken)
+
 nrow(geographicdata)
 nrow(data2)
 
@@ -267,16 +271,14 @@ for(i in 0:(max(geographicdata$days))){
   world$active[i]=sum(geographicdata$active[index])
 }
 
-world$dr2=world$deaths/world$active
-world=world[1:(nrow(world)-2),]
-
 #Could we plot a binomial distribution for deaths
-barplot(rbind((world$deaths2),world$active*0.18*pbinom(1:nrow(world),(round(world$active/1000)),mean(world$deathrate))), beside = TRUE, col = c("red", "blue")) #no
+barplot(rbind((world$deaths2),world$active*0.19*pbinom(1:nrow(world),(round(world$active/1000)),mean(world$deathrate))), beside = TRUE, col = c("red", "blue")) 
 #Seems like a very weak model.
 
 #How about a poisson model?
-fitdistr(geographicdata$world$deaths2, "poisson")
-plot
+fitdistr(world$deaths2, "poisson")
+barplot(rbind((world$deaths2),world$active*0.19*ppois(1:nrow(world), 17.83948)), beside = TRUE, col = c("red", "blue")) 
+#Seems like just as weak as the binomial model.
 
 #II)
 #How are death rates distributed: do they converge at a certain value or do they vary wildly?
@@ -289,14 +291,14 @@ hist(geographicdata$deathrate[which(geographicdata$deaths2!=0)],prob=T,breaks=50
 #Lets try modelling with a gamma function
 fitdistr(geographicdata$deathrate[which(geographicdata$deaths2!=0)], "gamma")
 hist(geographicdata$deathrate[which(geographicdata$deaths2!=0)],prob=T,breaks="fd")
-curve( dgamma(x,1.32888200 ,42.14284222)    ,add=T,col="red")
+curve( dgamma(x,1.06011822 ,21.99330112)    ,add=T,col="red")
 #Seems relatively well approximated
 
 #Lets test if we can indeed model this with a gamma function
 
 
 #create bins by breaking data into deciles
-bins=qgamma(0.1*(0:10),1.32888200 ,42.14284222)
+bins=qgamma(0.1*(0:10),1.06011822 ,21.99330112)
 
 binstuff=cut(geographicdata$deathrate[which(geographicdata$deaths2!=0)], breaks=bins,labels=F); binstuff
 
@@ -307,16 +309,15 @@ obs=as.vector(table(binstuff))
 exp=rep(sum(obs)/10,10)
 chisq=sum((obs-exp)^2/exp); chisq
 
-#p-value
+#P-value
 #10 Categories, imposed 2 parameters, set total of actual and expected equal. Therefore we
 #lose 3 dfs to get 7dfs
 
 pval=pchisq(chisq,df=7,lower.tail = F); pval
 
-#strongly reject null hypothesis
-#
-
-
+#We strongly reject null hypothesis, with p value 1.651946e-37 well below 0.05 significance
+#level, of no significant difference. We thus conclude under the given evidence that this 
+#distribution is not followed.
 
 #PART 2:
 #Exploring Correlations and Independences within our dataframes to Deathrate
