@@ -1,6 +1,16 @@
 #FINAL PROJECT MATH E-23C
 #JEAN-SEBASTIEN PAUL
-#EXPLORING COVID-19 DEATHRATES
+#EXPLORING COVID-19 DEATHRATES AND DEATHTOLL
+
+
+#GLOBAL OPTIONS:
+
+#This is done to get rid of irrelevant warnings, especially
+#the logistic regression warning where fitted probabilities
+#numerically 0 or 1 occurred, which doesent matter.
+options(warn=-1)
+#To turn it back on run the following:
+#options(warn=0)
 
 
 #NOTES:
@@ -65,15 +75,18 @@ library(neuralnet)
 library(glmnet)
 #install.packages("miscTools")
 library(miscTools)
-
+#install.packages("sandwich")
+library(sandwich)
 
 #SETTING SEED FOR CONSISTENT RESULTS
 set.seed(3.141592)
 
 
 
+
+
 #FUNCTIONS
-#(REQ: Professional Looking Software Engineering - functions)
+#(REQ: Professional Looking Software Engineering -> functions)
 
 #formatJHU:
 #Formats JHU COVID 19 data so that it is formatted like
@@ -157,6 +170,9 @@ data2Setup = function(data){
   data2=drop_na(data)
   data2$days=data2$Date-data2$Date[which.min(data2$Date)]
   
+  #make population.2020 real value, not scaled down by 1000
+  data2$Population.2020=data2$Population.2020*1000
+  
   #Categorical Variables:
   #Rich beign 1 defined as being above mean GDP/capita. 
   #Crime being 1 defined as being above mean crime
@@ -216,7 +232,8 @@ ggbar = function(a,b){
   
   return(ggplot(df, aes(days, value, fill=variable)) 
          + geom_bar(stat='Identity',position=position_dodge())
-         +ggtitle("Modelling the time series data for total COVID-19 deaths"))
+         +ggtitle("Modelling the time series data for total COVID-19 deaths")
+         +xlab("Days since 2020-01-22")+ylab("Total COVID-19 Deaths"))
 }
 
 #dropvif1:
@@ -237,6 +254,27 @@ dropvif1=function(fit,train.data){
 normalize=function(x){
   return((x-min(x))/(max(x) -min(x) ))
 }
+
+#testlassoridge:
+#runs diagnostics for normality of residuals and plots residual
+#fitted values plots. This is for deathrate modelling.
+testlassoridge=function(fits){
+  residuals=train.data$deathrate-fits
+  plot(fits[1:length(fits)]~residuals[1:length(residuals)])
+  return(shapiro.test(residuals[1:length(residuals)]))
+}
+
+#testlassoridge1:
+#runs diagnostics for normality of residuals and plots residual
+#fitted values plots. This is for daily deaths modelling.
+testlassoridge1=function(fits){
+  residuals=train.data$deaths-fits
+  plot(fits[1:length(fits)]~residuals[1:length(residuals)])
+  return(shapiro.test(residuals[1:length(residuals)]))
+}
+
+
+
 
 
 #DATA SCRAPING
@@ -282,6 +320,10 @@ normalize=function(x){
 # data2=predictors %>% right_join(data2, by=c("countriesAndTerritories"))
 # data2=data2Setup(data2)
 
+
+
+
+
 #READ FROM CSV (ALTERNATIVE TO DATASCRAPING)
 #(REQ: A dataframe, At least 2 numeric columns, A data set with lots of columns, 
 #allowing comparison of many different variables.)
@@ -301,22 +343,33 @@ nrow(geographicdata)
 nrow(data2)
 
 
+
+
+
 #ANALYSIS
 
 #PART 1:
 #Exploration regarding Distribution of Variables related to deathrate from COVID-19
 #using probability distributions.
 
+
 #I)
-#Can we model the time series data of new deaths world wide as binomial distribution?
+#Can we model the time series data of new deaths world wide as binomial or poisson distribution?
+#This would make sense as each case could be considered a bernoulli variable with probability of
+#surviving or dying.
+
 #We will look at the interval between days 1 to 106. We will use the more in depth 
-#in deathrate, geographicdata dataframe. It will contain over 50 countries.
+#in deathrate, geographicdata dataframe. It will contain 55 countries with data on these days.
 #(REQ: A barplot,Nicely labeled graphics using ggplot, with good use of color, line 
 #styles...)
 
 #max days
 max(geographicdata$days)
 
+#world will be a culmination of all the countries we have data on, with data on
+#total deaths and cases, daily deaths amd mew cases, active cases, deathrate
+#(deathrate will be data on all available countries not just the 55 as this should
+#make it more accurate without damaging analysis)
 world=geographicdata[1:max(geographicdata$days),]
 world$deathrate=1
 
@@ -345,16 +398,18 @@ world$days=as.numeric(world$days)
 
 #Could we plot a binomial distribution for deaths
 model=world$active*0.17*pbinom(1:nrow(world),(round(world$active/1000)),mean(world$deathrate))
-ggbar(world$deaths2,model)+xlab("Days since 2020-01-22")+ylab("Total COVID-19 Deaths")
+ggbar(world$deaths2,model)
 
-#Seems like a very weak model.
+#Seems like a weak model.
 
 #How about a poisson model?
+#we can use fitdistr to give us our parameters for the poisson distribution
 fitdistr(world$deaths2, "poisson")
 model=world$active*0.17*ppois(1:nrow(world), 17.83948)
-ggbar(world$deaths2,model)+xlab("Days since 2020-01-22")+ylab("Total COVID-19 Deaths")
+ggbar(world$deaths2,model)
 
 #Seems just as weak as the binomial model.
+
 
 #II)
 #How are death rates distributed: do they converge at a certain value or do they vary wildly?
@@ -370,12 +425,12 @@ p=ggplot(toplot, aes(x=deathrate))  +
 p
 
 #Lets try modelling with a gamma function
+#we can use fitdistr to give us our parameters for the gamma distribution
 fitdistr(geographicdata$deathrate[which(geographicdata$deaths2!=0)], "gamma")
 p+stat_function(fun=dgamma, args=list(shape=1.06011822, rate=21.99330112),col="red")+xlim(0,1)
 #Seems good
 
-#Lets test if we can indeed model this with a gamma function
-
+#Lets test if this is a good model
 
 #create bins by breaking data into deciles
 bins=qgamma(0.1*(0:10),1.06011822 ,21.99330112)
@@ -393,10 +448,13 @@ chisq=ChiSq(obs,exp); chisq
 
 pval=pchisq(chisq,df=7,lower.tail = F); pval
 
-#We got a p-value of 1.651946e-37. It is thus extremely improbably that we observe a test 
+#We got a p-value of 1.651946e-37. It is thus extremely improbable that we observe a test 
 #statistic this extreme from the relevant chi square distribution, so under the current 
 #evidence we strongly reject the null hypothesis at the 0.05 level of significance that the 
 #data follows a gamma distribution.
+
+
+
 
 
 #PART 2:
@@ -407,13 +465,16 @@ pval=pchisq(chisq,df=7,lower.tail = F); pval
 #I)
 #Is there a significant difference in death rates between rich countries 
 #and poor countries?
-#We will check via a permutation test
+#We will check via a permutation test and t test to confirm.
 #(REQ: A permutation test, Comparison of analysis by classical methods (chi-square, 
 #CLT) and simulation methods, An example where permutation tests or other computational 
 #techniques clearly work better than classical methods Nicely labeled graphics using 
 #ggplot, with good use of color, line styles...)
 
-#we will look only at the latest data from the latest date
+#we will look only at the latest data from the latest date; as such trying to avoid cases
+#where countries are only at the start of the outbreak, and repetition of countries whose
+#death rate may not change much whereas gdp/capita in this data is held fixed
+
 data2$Date[which.max(data2$Date)]
 
 rich=which(data2$Rich==1&data2$Date==data2$Date[which.max(data2$Date)])
@@ -470,7 +531,7 @@ p=ggplot(data2, aes(x=deathrate))  +
 p+stat_function(fun=dnorm, args=list(mean=mean(data2$deathrate), sd=sd(data2$deathrate)),col="red")+xlim(0,1)
 shapiro.test(data2$deathrate)
 
-#we receive p-value 2.2e-16 in the shapiro wilk test for normality
+#we receive p-value <2.2e-16 in the shapiro wilk test for normality
 #meaning that we reject the null hypothesis of no significant difference
 #with the normal distribution, and conclude that under the current 
 #evidence, death rate does not follow a normal distribution
@@ -478,6 +539,7 @@ shapiro.test(data2$deathrate)
 #As such the t test is fundamentally flawed. And the permutation test's
 #result of a strong rejection is given much more weight. This method is 
 #more appropriate than the classical method.
+
 
 #II)
 #Are crime and death rates are independent?
@@ -537,6 +599,10 @@ coord_fixed()
 #similarity. Perhaps this indicates that deathrate is relatively constant.
 
 
+
+
+
+
 #PART 3:
 #Modelling deathrate and deathtoll.
 
@@ -544,7 +610,7 @@ coord_fixed()
 #Modelling deathrate via logistic regression.
 #lets train some models on a random sample of 30% of the data
 #and then test on the rest of the sample.
-#then we can compare fitted R^2 to determine best model
+#then we can compare fitted SSE to determine best model
 #(REQ: Logistic Regression)
 
 temp <- subset(data2, select = -c(Country,countriesAndTerritories, geoId, countryterritoryCode, continentExp, Date, day, month, year, hdr, Entity, Code, dateRep))
@@ -606,12 +672,41 @@ train.data=subset(train.data,select = -c(Male.Lung))
 fit=glm(deathrate~.,data=train.data,family="binomial")
 
 vif(fit)
+
+
 #Seems good-we now have our first model
-fit; summary(fit)
+summary(fit)
+plot(fit)
+
+#diagnostic plots dont look promising, residuals vs fitted not totally
+#random, standardized residuals seem to follow normal distribution quite well
+#though
 #R2
 
+
 #model 2
-fit4=glm(deathrate~.^2,data=train.data,family="binomial"); summary(fit4)
+fit2=glm(deathrate~.^2,data=train.data,family="binomial"); summary(fit4)
+plot(fit2)
+
+#diagnostic plots dont look promising, residuals vs fitted not 
+#random, standardized residuals dont seem to follow normal distribution well, one
+#value outside cook's distance
+
+
+#model 3
+fit3=stepwise(fit,direction="backward/forward",criterion="AIC", trace=F)
+plot(fit3)
+
+#diagnostic plots dont look promising, residuals vs fitted not 
+#random, standardized residuals dont seem to follow normal distribution well
+
+
+#model 4
+fit4=stepwise(fit,direction="backward/forward",criterion="BIC", trace= F)
+plot(fit4)
+
+#diagnostic plots dont look promising, residuals vs fitted not 
+#random, standardized residuals dont seem to follow normal distribution well
 
 
 #model 5, LASSO Model
@@ -620,9 +715,24 @@ Y=train.data$deathrate
 cv=cv.glmnet(X,Y,alpha =1)
 model=glmnet(X,Y,alpha =1, lambda=cv$lambda.min)
 
+X1=cbind(1,X)
+testlassoridge(X1%*%coef(model));
+#plot doesent look random
+#we received p-value <2.2e-16 in the shapiro wilk test for normality
+#meaning that we reject the null hypothesis of no significant difference
+#with the normal distribution, and conclude that under the current 
+#evidence, the residuals do not follow a normal distribution
+
 #model 6, Ridge Model
 cv=cv.glmnet(X,Y,alpha =0)
 model2=glmnet(X,Y,alpha =0, lambda=cv$lambda.min)
+
+testlassoridge(X1%*%coef(model2))
+#doesent look random on bottom left hand side
+#we received p-value <2.2e-16 in the shapiro wilk test for normality
+#meaning that we reject the null hypothesis of no significant difference
+#with the normal distribution, and conclude that under the current 
+#evidence, the residuals do not follow a normal distribution
 
 #model 7, neural net
 #we need to normalize the data
@@ -642,7 +752,8 @@ test.data=test.data[which(colnames(test.data)%in%colnames(train.data))]
 
 sse1=sum(test.data$deathrate-predict(fit,new=test.data))^2
 sse2=sum(test.data$deathrate-predict(fit2,new=test.data))^2
-
+sse3=sum(test.data$deathrate-predict(fit3,new=test.data))^2
+sse4=sum(test.data$deathrate-predict(fit4,new=test.data))^2
 
 X.test = model.matrix(deathrate~.,test.data )
 fits = X.test%*%coef(model)
@@ -657,9 +768,19 @@ sse7=sum(test.data$deathrate-nn.results$net.result)^2
 sse8=sum(test.data$deathrat-fit8)^2
 
 
-c(mean(sse1),mean(sse2),mean(sse5),mean(sse6),mean(sse7),mean(sse8))/(nrow(test.data))
+c(mean(sse1),mean(sse2),mean(sse3),mean(sse4),mean(sse5),mean(sse6),mean(sse7),mean(sse8))/(nrow(test.data))
 
-#The second model was the best with lowest SSE 1.606557e+04.
+#The 6th model was the best with lowest SSE 5.267109e-04; (Ridge)
+
+r2 <- rSquared(test.data$deathrate, resid = as.matrix(test.data$deathrate-(X.test%*%coef(model2))[1:length(sse6)])); r2
+
+#pretty bad 0.4728446 R^2; not accounting for adjusted R^2 considering we
+#have many variables
+#adjusted R^2
+n=nrow(test.data)
+k=nrow(coef(model2))-1
+1-((1-r2)*(n-1))/(n-k-1)
+#about the same, still not great though
 
 
 #II)
@@ -741,9 +862,24 @@ Y=train.data$deaths
 cv=cv.glmnet(X,Y,alpha =1)
 model=glmnet(X,Y,alpha =1, lambda=cv$lambda.min)
 
+X1=cbind(1,X)
+testlassoridge1(X1%*%coef(model));
+#plot doesent look random esp on bottom left hand side
+#we received p-value <2.2e-16 in the shapiro wilk test for normality
+#meaning that we reject the null hypothesis of no significant difference
+#with the normal distribution, and conclude that under the current 
+#evidence, the residuals do not follow a normal distribution
+
 #model 8, Ridge Model
 cv=cv.glmnet(X,Y,alpha =0)
 model2=glmnet(X,Y,alpha =0, lambda=cv$lambda.min)
+
+testlassoridge1(X1%*%coef(model2));
+#plot doesent look random esp on bottom left hand side
+#we received p-value <2.2e-16 in the shapiro wilk test for normality
+#meaning that we reject the null hypothesis of no significant difference
+#with the normal distribution, and conclude that under the current 
+#evidence, the residuals do not follow a normal distribution
 
 #model 9, neural net
 #we need to normalize the data
@@ -760,7 +896,6 @@ nn=neuralnet(deaths ~ .-cases , data=ntrain.data, hidden=c(16,25), linear.output
 #we also need to remove the columns in testing data (for testing lasso and ridge)
 #that we removed in training
 test.data=test.data[which(colnames(test.data)%in%colnames(train.data))]
-
 
 
 sse1=sum(test.data$deaths-predict(fit,new=test.data))^2
@@ -780,10 +915,25 @@ sse8=sum(test.data$deaths-fits2)^2
 nn.results <- compute(nn, test.data)
 sse9=sum(test.data$deaths-nn.results$net.result)^2
 
+
 c(mean(sse1),mean(sse2),mean(sse3),mean(sse4),mean(sse5),mean(sse6),mean(sse7),mean(sse8),mean(sse9))/(nrow(test.data))
 
-
 #Our fifth and sixth models seems best
+#lets choose the fifth model
+
+
+r2 <- rSquared(test.data$deaths, resid = test.data$deaths-predict(fit5,new=test.data))
+#0.8881653
+
+#pretty great 0.8881653 R^2; not accounting for adjusted R^2 considering we
+#have many variables
+#adjusted R^2
+n=nrow(test.data)
+k=nrow(coef(model2))-1
+1-((1-r2)*(n-1))/(n-k-1)
+#about the same, 0.8844297, this is great!
+
+
 
 
 
