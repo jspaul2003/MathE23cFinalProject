@@ -931,7 +931,7 @@ r2 <- rSquared(test.data$deaths, resid = test.data$deaths-predict(fit5,new=test.
 n=nrow(test.data)
 k=nrow(coef(model2))-1
 1-((1-r2)*(n-1))/(n-k-1)
-#about the same, 0.8844297, this is great!
+#about the same, 0.8844297, this is pretty great!
 
 
 
