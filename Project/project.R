@@ -654,13 +654,12 @@ sse6=sum(test.data$deathrate-fits2)^2
 nn.results <- compute(nn, test.data)
 sse7=sum(test.data$deathrate-nn.results$net.result)^2
 
-sse8=sum(test.data$deathrat-fit8)^2/nrow(test.data)
+sse8=sum(test.data$deathrat-fit8)^2
 
 
 c(mean(sse1),mean(sse2),mean(sse5),mean(sse6),mean(sse7),mean(sse8))/(nrow(test.data))
 
-#Suprsingly the constant model was the most accurate with sse 1.336694e-06! Deathrate 
-#is best approximated by a constant
+#The second model was the best with lowest SSE 1.606557e+04.
 
 
 #II)
@@ -784,7 +783,7 @@ sse9=sum(test.data$deaths-nn.results$net.result)^2
 c(mean(sse1),mean(sse2),mean(sse3),mean(sse4),mean(sse5),mean(sse6),mean(sse7),mean(sse8),mean(sse9))/(nrow(test.data))
 
 
-#Our fifth model seems best
+#Our fifth and sixth models seems best
 
 
 
