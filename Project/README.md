@@ -1,10 +1,6 @@
 # MathE23cFinalProject
 TO DO:
 
-Linear Model
-
-Logistic Model
+finish up models
 
 Write up
-
-quarantine logic variable?
