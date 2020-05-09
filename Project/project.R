@@ -2,7 +2,9 @@
 #JEAN-SEBASTIEN PAUL
 #EXPLORING COVID-19 DEATHRATES
 
+
 #NOTES:
+
 #Correlation heatmap code learnt from:
 #http://www.sthda.com/english/wiki/ggplot2-quick-correlation-matrix-heatmap-r-software-and-data-visualization
 
@@ -31,8 +33,39 @@ library(ggplot2)
 library(reshape2)
 #install.packages("stats4")
 library(stats4)
-#install.package("fitdistrplus")
-library(fitdistrplus)
+#install.packages("RColorBrewer")
+library(RColorBrewer)
+#install.packages("latticeExtra")
+library(latticeExtra)
+#install.packages("Hmisc")     
+library(Hmisc)
+#install.packages("sem")
+library(sem)
+#install.packages("rgl")
+library(rgl)
+#install.packages("multcomp")
+library(multcomp)
+#install.packages("leaps")
+library(leaps)
+#install.packages("aplpack")
+library(aplpack)
+#install.packages("Rcmdr")
+library(Rcmdr)
+#install.packages("MASS")
+library(MASS)
+#install.packages("car")
+library(car)
+#install.packages("quantmod")
+library(quantmod)
+#install.packages("nnet")
+library(nnet)
+#install.packages("neuralnet")
+library(neuralnet)
+#install.packages("glmnet")
+library(glmnet)
+#install.packages("miscTools")
+library(miscTools)
+
 
 #SETTING SEED FOR CONSISTENT RESULTS
 set.seed(3.141592)
@@ -186,6 +219,25 @@ ggbar = function(a,b){
          +ggtitle("Modelling the time series data for total COVID-19 deaths"))
 }
 
+#dropvif1:
+#For use in model building section. Takes linear model
+#Finds largest vif. If greater than 10, it drops the relevant
+#variable. Returns data with dropped variable
+dropvif1=function(fit,train.data){
+  maxvif=which.max(vif(fit))
+  if(vif(fit)[[maxvif[[1]] ]]>10){
+    print(paste("Dropped",colnames(train.data)[maxvif[[1]]]))
+    train.data <- subset(train.data, select=-c(maxvif[[1]]))
+  }
+  return(train.data)
+}
+
+#normalize:
+#Normalizes data for neural net models
+normalize=function(x){
+  return((x-min(x))/(max(x) -min(x) ))
+}
+
 
 #DATA SCRAPING
 #NOTE: A CSV file has also been provided. This is here if you
@@ -240,6 +292,7 @@ geographicdata=data[,which(colnames(data)=="countriesAndTerritories"):ncol(data)
 geographicdata$days=geographicdata$Date-geographicdata$Date[which.min(geographicdata$Date)]
 geographicdata <- subset(geographicdata, select = -c(Entity, Code, Total.tests))
 data2=data2Setup(data)
+data2 <- subset(data2, select = -c(X))
 
 #(REQ: At least 20 rows, A data set so large it can be used as a population from 
 #which samples are taken)
@@ -312,8 +365,8 @@ ggbar(world$deaths2,model)+xlab("Days since 2020-01-22")+ylab("Total COVID-19 De
 
 toplot=subset(geographicdata, deaths2!=0)
 p=ggplot(toplot, aes(x=deathrate))  +
-       geom_histogram(aes(y=..density..), binwidth=0.01, colour="steelblue", fill="white",bins="fd") +
-      ylab("Density")+xlab("Death Rate")+ggtitle("Density Histogram of death rate")
+  geom_histogram(aes(y=..density..), binwidth=0.01, colour="steelblue", fill="white",bins="fd") +
+  ylab("Density")+xlab("Death Rate")+ggtitle("Density Histogram of death rate")
 p
 
 #Lets try modelling with a gamma function
@@ -355,8 +408,10 @@ pval=pchisq(chisq,df=7,lower.tail = F); pval
 #Is there a significant difference in death rates between rich countries 
 #and poor countries?
 #We will check via a permutation test
-#(REQ: A permutation test, Nicely labeled graphics using ggplot, with good 
-#use of color, line styles...)
+#(REQ: A permutation test, Comparison of analysis by classical methods (chi-square, 
+#CLT) and simulation methods, An example where permutation tests or other computational 
+#techniques clearly work better than classical methods Nicely labeled graphics using 
+#ggplot, with good use of color, line styles...)
 
 #we will look only at the latest data from the latest date
 data2$Date[which.max(data2$Date)]
@@ -397,6 +452,32 @@ pv.2t=2*pv.1t;pv.2t
 #Moreover, it is possible that these countries are not tracking all deaths
 #in them.
 
+#How about using a t test?
+#We will use a two-sample t-test to check whether there is evidence against the 
+#null hypothesis that two population means are equal
+t.test(data2$deathrate[rich],data2$deathrate[poor])
+
+#same conclusion at the 0.05 level of significance, albeit weaker with
+#p-value 0.04360523, with us rejecting the null hypothesis of no mean 
+#difference
+
+#However the weakness could be explained by whether the deathrate follows 
+#a normal distribution. (Which it does not as shown in I)). We will plot
+#again to confirm, and run a shapiro wilk test
+
+p=ggplot(data2, aes(x=deathrate))  +
+  geom_histogram(aes(y=..density..), binwidth=0.01, colour="steelblue", fill="white",bins="fd")
+p+stat_function(fun=dnorm, args=list(mean=mean(data2$deathrate), sd=sd(data2$deathrate)),col="red")+xlim(0,1)
+shapiro.test(data2$deathrate)
+
+#we receive p-value 2.2e-16 in the shapiro wilk test for normality
+#meaning that we reject the null hypothesis of no significant difference
+#with the normal distribution, and conclude that under the current 
+#evidence, death rate does not follow a normal distribution
+
+#As such the t test is fundamentally flawed. And the permutation test's
+#result of a strong rejection is given much more weight. This method is 
+#more appropriate than the classical method.
 
 #II)
 #Are crime and death rates are independent?
@@ -449,7 +530,7 @@ ggplot(data = melted_cormat, aes(Var2, Var1, fill = value))+
   theme(axis.text.x = element_text(angle = 90, vjust = 1, 
                                    size = 10, hjust = 1))+
   xlab("")+ylab("")+ggtitle("Correlation heatmap for COVID-19 data")
-  coord_fixed()
+coord_fixed()
 
 #Death rate actually isnt strongly correlated with much at all, 
 #with the other variables. Interestingly, we dont see high degrees of 
@@ -461,20 +542,249 @@ ggplot(data = melted_cormat, aes(Var2, Var1, fill = value))+
 
 #I)
 #Modelling deathrate via logistic regression.
-#lets train on a random sample of 30% of the data
+#lets train some models on a random sample of 30% of the data
 #and then test on the rest of the sample.
 #then we can compare fitted R^2 to determine best model
+#(REQ: Logistic Regression)
 
 temp <- subset(data2, select = -c(Country,countriesAndTerritories, geoId, countryterritoryCode, continentExp, Date, day, month, year, hdr, Entity, Code, dateRep))
 
+#would be unfair to feed death data here
+temp2=subset(temp,select=-c(deaths,deaths2,active))
 
-fit=step(glm(deathrate~.^2,data=temp,family="binomial"))
+boxplot(temp2)
+#there seems to be major spread of outliers and general spread in
+#GDP.2018. We will log(GDP.2018) to improve this.
+temp2$GDP.2018=I(log(temp2$GDP))
+boxplot(temp2)
 
-lm
+#there seems to be major spread of outliers and general spread in
+#Population.2020, Total.tests. We will log these to improve this.
+temp2$Population.2020=I(log(temp2$Population.2020))
+temp2$Total.tests=I(log(temp2$Total.tests))
+boxplot(temp2)
+
+#there seems to be major spread of outliers and general spread in
+#Cases2, recoveries. We cannot log these as they have 0 values.
+#lets try squarerooting these
+
+temp2$recoveries=I(sqrt(temp2$recoveries))
+temp2$cases2=I(sqrt(temp2$cases2))
+boxplot(temp2)
+
+#there seems to be major spread of outliers and general spread in
+#cases. We cannot log this as it has 0 values. lets try 
+#squarerooting these
+temp2$cases=I(sqrt(temp2$cases))
+boxplot(temp2)
+
+
+#80/20 split for training and testing data
+sample <-sample.int(n =nrow(temp2),size =floor(.80*nrow(temp2)), replace = F)
+train.data <- temp2[sample, ]
+test.data <-temp2[-sample,]
+train.data=drop_na(train.data)
+
+fit=glm(deathrate~.,data=train.data,family="binomial")
+
+#Check for multicollinearity
+vif(fit)
+
+#Deal with multicollinearity
+length=1
+while(length!=ncol(train.data)){
+  length=ncol(train.data)
+  train.data=dropvif1(fit,train.data)
+  fit=glm(deathrate~.,data=train.data,family="binomial")
+}
+
+vif(fit)
+
+#Male.lung seems quite high; although not 10 its very close to it. I will drop
+#this as such
+train.data=subset(train.data,select = -c(Male.Lung))
+fit=glm(deathrate~.,data=train.data,family="binomial")
+
+vif(fit)
+#Seems good-we now have our first model
+fit; summary(fit)
+#R2
+
+#model 2
+fit4=glm(deathrate~.^2,data=train.data,family="binomial"); summary(fit4)
+
+
+#model 5, LASSO Model
+X = model.matrix(deathrate~.,train.data )[,-1]
+Y=train.data$deathrate
+cv=cv.glmnet(X,Y,alpha =1)
+model=glmnet(X,Y,alpha =1, lambda=cv$lambda.min)
+
+#model 6, Ridge Model
+cv=cv.glmnet(X,Y,alpha =0)
+model2=glmnet(X,Y,alpha =0, lambda=cv$lambda.min)
+
+#model 7, neural net
+#we need to normalize the data
+train.data2=subset(train.data,select=-c(days)) #otherwise get errors when normalizing
+ntrain.data=as.data.frame(lapply(train.data2,normalize))
+ntrain.data=drop_na(ntrain.data)
+nn=neuralnet(deathrate ~ ., data=ntrain.data, hidden=c(16,25), linear.output =T, threshold=0.1)
+
+#model 8, the constant
+fit8=mean(train.data$deathrate)
+
+#Now Lets test accuracy!
+#We will look at SSE
+#we also need to remove the columns in testing data (for testing lasso and ridge)
+#that we removed in training
+test.data=test.data[which(colnames(test.data)%in%colnames(train.data))]
+
+sse1=sum(test.data$deathrate-predict(fit,new=test.data))^2
+sse2=sum(test.data$deathrate-predict(fit2,new=test.data))^2
+
+
+X.test = model.matrix(deathrate~.,test.data )
+fits = X.test%*%coef(model)
+sse5=sum(test.data$deathrate-fits)^2
+
+fits2 =X.test%*%coef(model2)
+sse6=sum(test.data$deathrate-fits2)^2
+
+nn.results <- compute(nn, test.data)
+sse7=sum(test.data$deathrate-nn.results$net.result)^2
+
+sse8=sum(test.data$deathrat-fit8)^2/nrow(test.data)
+
+
+c(mean(sse1),mean(sse2),mean(sse5),mean(sse6),mean(sse7),mean(sse8))/(nrow(test.data))
+
+#Suprsingly the constant model was the most accurate with sse 1.336694e-06! Deathrate 
+#is best approximated by a constant
+
+
+#II)
+#Can we do a better job modelling the total deaths?
+#(REQ: Use of linear regression)
+
+temp2=subset(temp,select=-c(deaths2,deathrate,active))
+
+#we can run same code to deal with spread of outliers
+temp2$GDP.2018=I(log(temp2$GDP))
+temp2$Population.2020=I(log(temp2$Population.2020))
+temp2$Total.tests=I(log(temp2$Total.tests))
+temp2$recoveries=I(sqrt(temp2$recoveries))
+temp2$cases2=I(sqrt(temp2$cases2))
+temp2$cases=I(sqrt(temp2$cases))
+
+boxplot(temp2)
+
+#80/20 split for training and testing data
+sample <-sample.int(n =nrow(temp2),size =floor(.80*nrow(temp2)), replace = F)
+train.data <- temp2[sample, ]
+test.data <-temp2[-sample,]
+train.data=drop_na(train.data)
+
+fit=lm(deaths~.,data=train.data)
+vif(fit)
+
+#deal with multicollinearity
+length=1
+while(length!=ncol(train.data)){
+  length=ncol(train.data)
+  train.data=dropvif1(fit,train.data)
+  fit=lm(deaths~.,data=train.data)
+}
+
+vif(fit)
+
+#looking good, we have our first model
+summary(fit)
+plot(fit)
+#diagnostic plots dont look promising, residuals vs fitted not totally
+#random, standardized residuals dont seem to follow normal distribution well
+
+#model 2
+fit2=stepwise(fit,direction='forward/backward',criterion='BIC',trace='false'); summary(fit2)
+plot(fit2)
+#diagnostic plots dont look promising, residuals vs fitted not totally
+#random, standardized residuals dont seem to follow normal distribution well
+
+#model 3
+fit3=stepwise(fit,direction='forward/backward',criterion='AIC',trace='false'); summary(fit3)
+plot(fit3)
+#diagnostic plots dont look promising, residuals vs fitted not totally
+#random, standardized residuals dont seem to follow normal distribution well
+
+#model 4
+fit4=lm(deaths~.^2,data=train.data)
+plot(fit4)
+#diagnostic plots seem better, residuals vs fitted not totally
+#random at lower fitted values, but well spaced as this gets higher,
+#standardized residuals dont seem to follow normal distribution well
+
+#model 5
+fit5=stepwise(fit4,direction='forward/backward',criterion='AIC',trace='false'); summary(fit3)
+plot(fit5)
+#diagnostic plots dont look promising, residuals vs fitted not totally
+#random, standardized residuals dont seem to follow normal distribution well
+
+#model 6
+fit6=stepwise(fit4,direction='forward/backward',criterion='AIC',trace='false'); summary(fit3)
+plot(fit6)
+#diagnostic plots seem better, residuals vs fitted not totally
+#random at lower fitted values, but well spaced as this gets higher,
+#standardized residuals dont seem to follow normal distribution well
+
+#model 7, LASSO Model
+X = model.matrix(deaths~.,train.data )[,-1]
+Y=train.data$deaths
+cv=cv.glmnet(X,Y,alpha =1)
+model=glmnet(X,Y,alpha =1, lambda=cv$lambda.min)
+
+#model 8, Ridge Model
+cv=cv.glmnet(X,Y,alpha =0)
+model2=glmnet(X,Y,alpha =0, lambda=cv$lambda.min)
+
+#model 9, neural net
+#we need to normalize the data
+ntrain.data=as.data.frame(lapply(train.data,normalize))
+nn=neuralnet(deaths ~ .-cases , data=ntrain.data, hidden=c(16,25), linear.output =T, threshold=0.1)
+#dropping cases or else get:
+#Error: the error derivative contains a NA; varify that the derivative function 
+#does not divide by 0 (e.g. cross entropy)
+
+#which shouldnt be possible as probability never 0 implying this column led
+#R to rounding some really small number
+
+#Checking our models
+#we also need to remove the columns in testing data (for testing lasso and ridge)
+#that we removed in training
+test.data=test.data[which(colnames(test.data)%in%colnames(train.data))]
 
 
 
+sse1=sum(test.data$deaths-predict(fit,new=test.data))^2
+sse2=sum(test.data$deaths-predict(fit2,new=test.data))^2
+sse3=sum(test.data$deaths-predict(fit3,new=test.data))^2
+sse4=sum(test.data$deaths-predict(fit4,new=test.data))^2
+sse5=sum(test.data$deaths-predict(fit5,new=test.data))^2
+sse6=sum(test.data$deaths-predict(fit6,new=test.data))^2
 
+X.test = model.matrix(deaths~.,test.data )
+fits = X.test%*%coef(model)
+sse7=sum(test.data$deaths-fits)^2
+
+fits2 =X.test%*%coef(model2)
+sse8=sum(test.data$deaths-fits2)^2
+
+nn.results <- compute(nn, test.data)
+sse9=sum(test.data$deaths-nn.results$net.result)^2
+
+c(mean(sse1),mean(sse2),mean(sse3),mean(sse4),mean(sse5),mean(sse6),mean(sse7),mean(sse8),mean(sse9))/(nrow(test.data))
+
+
+#Our fifth model seems best
 
 
 
