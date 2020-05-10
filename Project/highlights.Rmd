@@ -521,7 +521,7 @@ Comparison on the testing data revealed the fifth and sixth models to be best, w
 
 
 ![](images/m2a.png){#id .class width=50% height=50%}
-![](images/m2b.png){#id .class width=30% height=30%}
+![](images/m2b.png){#id .class width=50% height=50%}
 
 
 
