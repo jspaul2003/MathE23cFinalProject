@@ -1,0 +1,21 @@
+---
+title: "Exploring COVID-19 Deathrates and Deathtolls"
+author: "Jean-Sebastien Paul"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Abstract
+
+The outbreak of the COVID-19 coronavirus, caused by severe acute respiratory syndrome (SARS) coronavirus 2 (SARS-CoV-2), has so far killed over 276K people and infected a confirmed 3.97M. This open-ended project was intended to explore deathtolls and deathrates, hopefully providing insight as to what affects these and what can be done to reduce this.
+
+
+## Intoduction
+
+```{r cars}
+summary(cars)
+```
+

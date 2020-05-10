@@ -1,4 +1,5 @@
 #FINAL PROJECT MATH E-23C
+
 #JEAN-SEBASTIEN PAUL
 #EXPLORING COVID-19 DEATHRATES AND DEATHTOLL
 
@@ -465,80 +466,73 @@ pval=pchisq(chisq,df=7,lower.tail = F); pval
 #I)
 #Is there a significant difference in death rates between rich countries 
 #and poor countries?
+
 #We will check via a permutation test and t test to confirm.
 #(REQ: A permutation test, Comparison of analysis by classical methods (chi-square, 
 #CLT) and simulation methods, An example where permutation tests or other computational 
 #techniques clearly work better than classical methods Nicely labeled graphics using 
 #ggplot, with good use of color, line styles...)
 
-#we will look only at the latest data from the latest date; as such trying to avoid cases
-#where countries are only at the start of the outbreak, and repetition of countries whose
-#death rate may not change much whereas gdp/capita in this data is held fixed
+rich=which(data2$Rich==1)
+poor=which(data2$Rich==0)
 
-data2$Date[which.max(data2$Date)]
-
-rich=which(data2$Rich==1&data2$Date==data2$Date[which.max(data2$Date)])
-poor=which(data2$Rich==0&data2$Date==data2$Date[which.max(data2$Date)])
-deathRateDif=mean(data2$deathrate[rich])-mean(data2$deathrate[poor]); deathRateDif
-#Unsuprisingly Higher, but not by much. Likely to be insignificant.
-
-temp=data2[which(data2$Date==data2$Date[which.max(data2$Date)]),]
-
-N=100000; diff=numeric(N)
-for(i in 1:N){
-  samp=sample(nrow(temp),sum(temp$Rich==0)) 
-  drsamp=mean(temp$deathrate[samp])
-  drother=mean(temp$deathrate[-samp])
-  diff[i]=drsamp-drother
-}
-
-p=ggplot() + 
-  aes(diff)+ 
-  geom_histogram(binwidth=0.001,bins=100, colour=rgb(0,0.8,0.107,1), fill=rgb(0,0.62,0.107,1))+
-  ylab("Count")+
-  xlab("Differences in death rates between rich and poor countries")+
-  ggtitle("Histogram of differences in death rates between rich and poor countries")
-
-p+geom_vline(xintercept =deathRateDif,col="blue")
-
-#Does not look significant, reaffirming what we thought before
-
-pv.1t=(sum(diff>=deathRateDif)+1)/(N+1)
-pv.2t=2*pv.1t;pv.2t
-
-#Not significant at 0.05 level of significance somewhat suprisingly-
-#There is a 58.88741% chance of discrepency by chance. 
-#This is probably because poorer countries do not have the resources
-#to test everyone and thus do not know exactly how some might have died.
-#Moreover, it is possible that these countries are not tracking all deaths
-#in them.
-
-#How about using a t test?
+#Using a t test
 #We will use a two-sample t-test to check whether there is evidence against the 
-#null hypothesis that two population means are equal
+#null hypothesis that the two population means are equal
 t.test(data2$deathrate[rich],data2$deathrate[poor])
 
-#same conclusion at the 0.05 level of significance, albeit weaker with
-#p-value 0.04360523, with us rejecting the null hypothesis of no mean 
-#difference
+#At the 0.05 level of significance, we failt to reject the null hypothesis of no mean 
+#difference suprisingly. As one would have thought richer countries would be better
+#dealing with cases with better healthcare. Perhaps poorer countries have worse 
+#testing and are unable to find the true death rate
 
 #However the weakness could be explained by whether the deathrate follows 
-#a normal distribution. (Which it does not as shown in I)). We will plot
-#again to confirm, and run a shapiro wilk test
+#a normal distribution, which it must do to satisfy the assumption of the t-test. 
+#We will plot this to confirm, and run a Shapiro-Wilk test of normality.
 
 p=ggplot(data2, aes(x=deathrate))  +
   geom_histogram(aes(y=..density..), binwidth=0.01, colour="steelblue", fill="white",bins="fd")
 p+stat_function(fun=dnorm, args=list(mean=mean(data2$deathrate), sd=sd(data2$deathrate)),col="red")+xlim(0,1)
 shapiro.test(data2$deathrate)
 
-#we receive p-value <2.2e-16 in the shapiro wilk test for normality
+#We receive p-value <2.2e-16 in the shapiro wilk test for normality
 #meaning that we reject the null hypothesis of no significant difference
 #with the normal distribution, and conclude that under the current 
-#evidence, death rate does not follow a normal distribution
+#evidence, death rate does not follow a normal distribution. This means the 
+#t test assumptions were not satisfied, and the test is invalidated.
 
-#As such the t test is fundamentally flawed. And the permutation test's
-#result of a strong rejection is given much more weight. This method is 
-#more appropriate than the classical method.
+
+#The permutation test does not make any assumption of normality. so we can 
+#use this to test for mean difference in rich and poor.
+
+deathRateDif=mean(data2$deathrate[rich])-mean(data2$deathrate[poor]); deathRateDif
+#Unsurprisingly higher 
+
+N=100000; diff=numeric(N)
+for(i in 1:N){
+  samp=sample(nrow(temp),sum(data2$Rich==0)) 
+  drsamp=mean(data2$deathrate[samp])
+  drother=mean(data2$deathrate[-samp])
+  diff[i]=drsamp-drother
+}
+
+p=ggplot() + 
+  aes(diff)+ 
+  geom_histogram(binwidth=0.0001,bins=1000, colour=rgb(0,0.8,0.107,1), fill=rgb(0,0.62,0.107,1))+
+  ylab("Count")+
+  xlab("Differences in death rates between rich and poor countries")+
+  ggtitle("Histogram of differences in death rates between rich and poor countries")
+
+p+geom_vline(xintercept =deathRateDif,col="blue")
+
+pv.1t=(sum(diff>=deathRateDif)+1)/(N+1)
+pv.2t=2*pv.1t;pv.2t
+
+#There is a 4.219958% chance of discrepency by chance, so we reject 
+#the null hypothesis of no mean difference at the 0.05 level of significance.
+#This is unsuprising as richer countries can afford better healthcare and makes
+#more sense. This conclusion is given more weight due to the fundamentally flawed
+#nature of the t-test.
 
 
 #II)
