@@ -350,13 +350,13 @@ nrow(data2)
 #ANALYSIS
 
 #PART 1:
-#Exploration regarding Distribution of Variables related to deathrate from COVID-19
+#Exploration of Distribution of Variables related to death rate from COVID-19
 #using probability distributions.
 
 
 #I)
 #Can we model the time series data of new deaths world wide as binomial or poisson distribution?
-#This would make sense as each case could be considered a bernoulli variable with probability of
+#This would make sense as each case could be considered a Bernoulli random variable with probability of
 #surviving or dying.
 
 #We will look at the interval between days 1 to 106. We will use the more in depth 
@@ -406,14 +406,15 @@ ggbar(world$deaths2,model)
 #How about a poisson model?
 #we can use fitdistr to give us our parameters for the poisson distribution
 fitdistr(world$deaths2, "poisson")
-model=world$active*0.17*ppois(1:nrow(world), 17.83948)
+model=world$active*0.17*ppois(1:nrow(world), 16.68705)
 ggbar(world$deaths2,model)
 
 #Seems just as weak as the binomial model.
 
 
 #II)
-#How are death rates distributed: do they converge at a certain value or do they vary wildly?
+#How is the frequency of death rates distributed: does this converge at a certain value or does 
+#it vary wildly?
 #(REQ: A histogram, A probability density function overlaid on a histogram, A p-value or other
 #statistic based on a distribution function, Appropriate use of R functions for a probability 
 #distribution other than binomial, normal, or chi-square, Nicely labeled graphics using ggplot, 
@@ -481,8 +482,8 @@ poor=which(data2$Rich==0)
 #null hypothesis that the two population means are equal
 t.test(data2$deathrate[rich],data2$deathrate[poor])
 
-#At the 0.05 level of significance, we failt to reject the null hypothesis of no mean 
-#difference suprisingly. As one would have thought richer countries would be better
+#At the 0.05 level of significance, we fail to reject the null hypothesis of no mean 
+#difference suprisingly with p value 0.07699. One would have thought richer countries would be better
 #dealing with cases with better healthcare. Perhaps poorer countries have worse 
 #testing and are unable to find the true death rate
 
@@ -506,11 +507,11 @@ shapiro.test(data2$deathrate)
 #use this to test for mean difference in rich and poor.
 
 deathRateDif=mean(data2$deathrate[rich])-mean(data2$deathrate[poor]); deathRateDif
-#Unsurprisingly higher 
+#surprisingly higher 
 
 N=100000; diff=numeric(N)
 for(i in 1:N){
-  samp=sample(nrow(temp),sum(data2$Rich==0)) 
+  samp=sample(nrow(data2),sum(data2$Rich==0)) 
   drsamp=mean(data2$deathrate[samp])
   drother=mean(data2$deathrate[-samp])
   diff[i]=drsamp-drother
@@ -530,13 +531,10 @@ pv.2t=2*pv.1t;pv.2t
 
 #There is a 4.219958% chance of discrepency by chance, so we reject 
 #the null hypothesis of no mean difference at the 0.05 level of significance.
-#This is unsuprising as richer countries can afford better healthcare and makes
-#more sense. This conclusion is given more weight due to the fundamentally flawed
-#nature of the t-test.
-
+#This is suprising.
 
 #II)
-#Are crime and death rates are independent?
+#Are crime and high death rates are independent?
 #hdr is a logical variable which is 1 for countries in the upper half
 #of death rates, and 0 for countries in the lower half.
 #We will check via a chi-squared test on hdr and crime.
@@ -585,10 +583,10 @@ ggplot(data = melted_cormat, aes(Var2, Var1, fill = value))+
   theme_minimal()+ 
   theme(axis.text.x = element_text(angle = 90, vjust = 1, 
                                    size = 10, hjust = 1))+
-  xlab("")+ylab("")+ggtitle("Correlation heatmap for COVID-19 data")
+  xlab("")+ylab("")+ggtitle("Correlation heatmap for COVID-19 data")+
 coord_fixed()
 
-#Death rate actually isnt strongly correlated with much at all, 
+#Death rate actually isnt strongly correlated much at all
 #with the other variables. Interestingly, we dont see high degrees of 
 #similarity. Perhaps this indicates that deathrate is relatively constant.
 
@@ -764,17 +762,16 @@ sse8=sum(test.data$deathrat-fit8)^2
 
 c(mean(sse1),mean(sse2),mean(sse3),mean(sse4),mean(sse5),mean(sse6),mean(sse7),mean(sse8))/(nrow(test.data))
 
-#The 6th model was the best with lowest SSE 5.267109e-04; (Ridge)
+#The 6th model was the best with lowest SSE 9.725754e-05; (Ridge)
 
-r2 <- rSquared(test.data$deathrate, resid = as.matrix(test.data$deathrate-(X.test%*%coef(model2))[1:length(sse6)])); r2
-
-#pretty bad 0.4728446 R^2; not accounting for adjusted R^2 considering we
+r2 <- rSquared(test.data$deathrate, resid = as.matrix(test.data$deathrate-(X.test%*%coef(model2))))
+#pretty bad 0.4729924 R^2; not accounting for adjusted R^2 considering we
 #have many variables
 #adjusted R^2
 n=nrow(test.data)
 k=nrow(coef(model2))-1
 1-((1-r2)*(n-1))/(n-k-1)
-#about the same, still not great though
+#about the same 0.4519564, still not great though
 
 
 #II)
@@ -916,8 +913,8 @@ c(mean(sse1),mean(sse2),mean(sse3),mean(sse4),mean(sse5),mean(sse6),mean(sse7),m
 #lets choose the fifth model
 
 
-r2 <- rSquared(test.data$deaths, resid = test.data$deaths-predict(fit5,new=test.data))
-#0.8881653
+r2 <- rSquared(test.data$deaths, resid = test.data$deaths-predict(fit5,new=test.data)); r2
+#0.8900757
 
 #pretty great 0.8881653 R^2; not accounting for adjusted R^2 considering we
 #have many variables
@@ -925,7 +922,7 @@ r2 <- rSquared(test.data$deaths, resid = test.data$deaths-predict(fit5,new=test.
 n=nrow(test.data)
 k=nrow(coef(model2))-1
 1-((1-r2)*(n-1))/(n-k-1)
-#about the same, 0.8844297, this is pretty great!
+#about the same,  0.8864039, this is pretty great!
 
 
 
