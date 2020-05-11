@@ -70,6 +70,7 @@ library(glmnet)
 library(miscTools)
 #install.packages("sandwich")
 library(sandwich)
+library(actuar)
 
 #SETTING SEED FOR CONSISTENT RESULTS
 set.seed(3.141592)
@@ -291,7 +292,7 @@ https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_d
 COVID-19 Predictors were taken from Kaggle^[https://www.kaggle.com/nightranger77/covid19-demographic-predictors]. Predictors extracted from this included: Density^[https://www.worldometers.info/ - Data on Density, Population, Median Age, Urban Population], Urban Population, 2020 Population, Hospital Beds/1000 citizens^[https://data.worldbank.org/indicator/SH.MED.BEDS.ZS], Sex Ratio (overall and based on age)^[https://en.wikipedia.org/wiki/List_of_countries_by_sex_ratio, https://data.worldbank.org/indicator/SP.POP.TOTL.FE.ZS], Lung diseases death rate^[https://www.worldlifeexpectancy.com/cause-of-death/lung-disease/by-country/] (overall and for both sexes), Median age, 2018 GDP^[https://data.worldbank.org/indicator/NY.GDP.MKTP.CD], Crime Index^[https://worldpopulationreview.com/countries/crime-rate-by-country/], Smoking Rate (2016)^[https://ourworldindata.org/smoking#prevalence-of-smoking-across-the-world], for as many countries as possible.
 
 ### Testing Data
-COVID-19 Testing data was downloaded from ourworldindata^[https://ourworldindata.org/grapher/full-list-total-tests-for-covid-19]. This was cumulative number of tests for each country available on a date basis.
+COVID-19 Testing data was downloaded from ourworldindata^[https://ourworldindata.org/grapher/full-list-total-tests-for-covid-19]. This was the cumulative number of tests for each country available on a date basis.
 
 ### Case and Death Data
 COVID-19 Case and Death Data was extracted from the European Centre for Disease Prevention and Control^[https://www.ecdc.europa.eu/en/publications-data/download-todays-data-geographic-distribution-covid-19-cases-worldwide]. This contained new cases and deaths each day for a large number of countries. Cumulative cases and deaths was added, as was deathrate.
@@ -307,9 +308,9 @@ All these datapoints were joined by country and by date. 2 main dataframes were 
 
 # Topic 1: Exploration of the Distribution and Time Series change of Variables related to Death Rate from COVID-19 using probability distributions.
 
-## Part 1: Can we model the time series data of new deaths world wide as binomial or poisson distribution
+## Part 1: Can we model the time series data of new deaths world wide as binomial or poisson distribution?
 
-It was theorized that the time series data of new COVID-19 deaths worldwide could be modelled as fitting a poisson or binomial distribution. This would make sense as each case could be considered a Bernoulli random variable with some probability of surviving or dying. This probability was though to be relatively constant enough that the model should see some success.
+It was theorized that the time series data of new COVID-19 deaths worldwide could be modelled as fitting a poisson or binomial distribution. This would make sense as each case could be considered a Bernoulli random variable with some probability of surviving or dying. This probability was though to be relatively constant- enough that the model should see some success.
 
 However both models were weak. The best binomial model found was defined as: $Total Deaths= Active Cases*0.17*P(X\leq Day)$ where $X\sim Binom(k, Death Rate)$, $k$ is defined as $Active Cases/1000$ rounded to the nearest whole number, $Day$ is days since 2020-01-22, and $DeathRate$ is considered to be the mean overall total death rate. The plot of this model is shown below.
 ```{r, results='hide', include=FALSE}
@@ -348,7 +349,7 @@ ggbar(world$deaths2,model)
 
 This is clearly an ill-fitting model, overpredicting for the first 90 days. It erroneously also a predicted a first wave of COVID-19 deaths of sorts. Whilst it might have started to fit the real data well towards the end, it was overall poor.
 
-The Poisson model did not fare better, with near identical results. The best model found was defined as $Total Deaths= Active Cases*0.17*P(X\leq Day)$ where $X\sim Binom(k, Death Rate)$ and $Day$ is days since 2020-01-22. The plot of this model is shown below.
+The Poisson model did not fare better, with near identical results. This is unsuprising as the binomial tends to the poisson in the limit of large n given many samples and provided that they are approximately independent The best model found was defined as $Total Deaths= Active Cases*0.17*P(X\leq Day)$ where $X\sim Pois(16.68705)$ and $Day$ is days since 2020-01-22. The plot of this model is shown below.
 ```{r, results='hide', include=FALSE}
 model=world$active*0.17*ppois(1:nrow(world), 16.68705)
 ```
@@ -381,9 +382,15 @@ This suggested that a gamma distribution would be a good fit. A gamma probabilit
 p+stat_function(fun=dgamma, args=list(shape=1.06011822, rate=21.99330112),col="red")+xlim(0,1)
 ```
 
-This looked like a decent fit. However this was shown to be wrong by a chi squared test that returned a p-value of 1.651946e-37. It is thus extremely improbable that we observe a test  statistic this extreme from the relevant chi square distribution, so under the current  evidence we strongly rejected the null hypothesis that deathrates follows a gamma distribution and failed to model the distribution of death rates.
+This looked like a decent fit. However this was shown to be wrong by a chi squared test that returned a p-value of 1.651946e-37. It is thus extremely improbable that we observe a test  statistic this extreme from the relevant chi square distribution, so under the current  evidence we strongly rejected the null hypothesis that deathrates follows a gamma distribution and failed to model the distribution of death rates. This is unsuprising as the blips seen (especially between 0.25 and 0.5) imply a standard distribution like the gamma distribution will not be valid. Potentially a heavy tail distribution could be used to alleviate this.
 
+As such, a Burr Heavy tailed distribution was fitted with $f_X(x) = dburr(shape1=2.010724,shape2=1.354063,rate=16.967252)$. 
 
+```{r echo=FALSE}
+p+stat_function(fun=dburr, args=list(shape1=2.010724,shape2=1.354063,rate=16.967252 ),col="red")+xlim(0,1)
+```
+
+Running the Two-sample Kolmogorov-Smirnov test resulted in a p-value of 0.07323082. This meant we failed to reject the null hypothesis at the 0.05 level  of significancethat the sample came from the relevant distribution. Therefore it was concluded that deathrate counts can indeed be approximated by the Burr distribution.
 
 # Topic 2: Exploring Correlations and Independences within COVID-19 Data
 
@@ -423,14 +430,14 @@ p=ggplot() +
 t.test(data2$deathrate[rich],data2$deathrate[poor])
 ```
 
-The T test returned a p-value 0.07699, seemingly leading to the suprising acceptance of the null hypothesis of no mean difference of death rates between rich and poor countries. However the t-test was discovered to be fundementally flawed. T-tests assume normality. COVID-19 Death-rates do not follow a normal distribution. 
+The T test returned a p-value 0.07699, seemingly leading to the acceptance of the null hypothesis of no mean difference of death rates between rich and poor countries. However the t-test was discovered to be fundementally flawed. T-tests assume normality. COVID-19 death-rates do not follow a normal distribution.
 
 ```{r echo=FALSE}
 p2+stat_function(fun=dnorm, args=list(mean=mean(data2$deathrate), sd=sd(data2$deathrate)),col="red")+xlim(0,1)
 shapiro.test(data2$deathrate)
 ```
 
-This is clearly shown by the plot and the Shapiro-Wilk test for normality, with p-value <2.2e-16 meaning that we reject the null hypothesis of no significant difference with the normal distribution.
+This is clearly shown by the plot of the overlayed normal distribution and the Shapiro-Wilk test for normality, with p-value <2.2e-16 meaning that we reject the null hypothesis of no significant difference with the normal distribution.
 
 As such a Permutation test was to be used to test for significant mean difference between rich and poor country deathrates, with no prior assumptions needed. 
 
@@ -441,14 +448,14 @@ p+geom_vline(xintercept =deathRateDif,col="blue")
 There is a 4.199958% chance of discrepency by chance (by the p-value extracted from the test). We reject the null hypothesis of no mean difference at the 0.05 level of significance. This leads to suprising conclusion that richer countries have higher COVID-19 Deathrates. This is probably because poorer countries have less testing and are therefore less able to determine who has died from COVID-19, to such an extent that this would occur. The significant difference could be promising for modelling in topic 3 later on.
 
 
-## Part 2: Are crime and high death rates are independent?
+## Part 2: Are crime and high death rates independent?
 
 A new logical variable $hdr$ was defined: being 1 for countries in the upper half of death rates, and 0 for countries in the lower half. A chi-squared test on this and $Crime$ was used to investigate independence. Below is the contingency table for these variables.
 
 ![](images/ct.png){#id .class width=30% height=30%}
 
 
-The chi-squared test returned a p-value so small that the computer used rounded it to 0. This meant that the null hypothosis of independence was strongly rejected. Crime and high deathrates are unsuprisingly related, crime itself being correlated with many other critical variables in a society such as wealth and how obeyant a population is. This suggests crime will be useful in modelling in topic 3.
+The chi-squared test returned a p-value so small that the computer used rounded it to 0. This meant that the null hypothosis of independence was strongly rejected. Crime and high deathrates are unsuprisingly related, crime itself being correlated with many other critical variables in a society such as wealth and how obeyant a population is, implying omitted variable bias is at play. This suggests crime will be useful in modelling in topic 3.
 
 
 ## Part 3: Exploring Correlation of all our data variables amongst themselves
@@ -487,6 +494,17 @@ Death rate is actually not strongly correlated much at all with the other variab
 
 ## Modelling deathrate via logistic regression
 
+### Part 1: univariate logistic regression
+
+The first attempt at doing this was with a univariate logistic model using recovery data.
+
+![](images/m0.png){#id .class width=100% height=100%}
+
+
+As can be clearly seen, this is a very poor model, as reflected in the low $R^2$ value of 0.06582144. A different approach will likely be needed to explain more of the variance in deathrate, hence multiple logistic regression.
+
+### Part 2: multiple logistic regression
+
 8 models were trained on 80% of the data, and tested on the other 20%. The best model was determined as that which had the lowest squared estimate of errors .
 
 To reduce spread of outliers: $GDP.2018$, $Population.2020$, $Total.tests$ were logged. $recoveries$, $cases2$ and $cases$ were squarerooted however since they had 0 values in the data.
@@ -495,13 +513,15 @@ In order to deal with multicollinearity, the following were dropped one by one f
 
 The first model was a logistic regression of deathrate onto all the available variables. The second model was a logistic regression model of deathrate onto the interaction terms of all the available variables to the second power. The third model was a backward/forward stepwise regression model on the first model with AIC criterion. The fourth model was a backward/forward stepwise regression model on the first model with BIC criterion. The fifth model was a lasso model of deathrate onto all the available variables. The sixth model was a lasso model of deathrate onto all the available variables. The seventh model was a neural net with threshold 0.1 of deathrate onto all the available variables. Finally, the eighth model was simply a constant: the mean deathrate.
 
-Comparison on the testing data revealed the sixth model (ridge) to be best, with the lowest SSE. However this model had a relatively poor $R^2$ value of 0.4729924. It's adjusted $R^2$ was very close though at 0.4519564, indicating that the model did not overfit and strongly explained some of the variance. It should be noted that diagnostic plots were not promising with the fitted values versus residual plot not looking random on the bottom left hand side. Moreover we received p-value <2.2e-16 in the shapiro wilk test for normality on residuals meaning that we rejected the null hypothesis of no significant difference with the normal distribution, and conclude that under the current evidence, the residuals do not follow a normal distribution; directly against the assumptions of linear regression. This may compromise the model.
+Comparison on the testing data revealed the second model to be best, with the lowest SSE. Whilst it does have NAs in its coefficients, this can be explained by variables in question being linearly related to the other variables. This is not a problem here though because we have interaction terms and is to be expected^[https://statisticalhorizons.com/multicollinearity]. Overall this model had a relatively poor $R^2$ value of 0.5249956. Its adjusted $R^2$ was very close however at 0.5060354, indicating that the model did not overfit and strongly explained some of the variance. It should be noted that in diagnostics, point 1984's cook's distance was worrying and could have compromised the model.
 
-![](images/m1.png){#id .class width=30% height=30%}
+![](images/m1.png){#id .class width=100% height=100%}
+
+
+
 ![](images/m1a.png){#id .class width=50% height=50%}
-![](images/m1b.png){#id .class width=30% height=30%}
 
-## Modelling total d via logistic regression
+## Modelling total deaths via linear regression
 
 
 9  models were trained on 80% of the data, and tested on the other 20%. The best model was determined as that which had the lowest squared estimate of errors .
@@ -512,7 +532,7 @@ In order to deal with multicollinearity, the following were dropped one by one f
 
 The first model was a linear regression of deathrate onto all the available variables. The second model was a forward/backward stepwise regression model on the first model with AIC criterion. The third model was a forward/backward stepwise regression model on the first model with BIC criterion The fourth model was a logistic regression model of deathrate onto the interaction terms of all the available variables to the second power. The fifth model was a forward/backward stepwise regression model on the fourth model with AIC criterion. The sixth model was a forward/backward stepwise regression model on the fourth model with BIC criterion The seventh model was a lasso model of deathrate onto all the available variables. The eighth model was a lasso model of deathrate onto all the available variables. The ninth model was a neural net with threshold 0.1 of deathrate onto all the available variables. 
 
-Comparison on the testing data revealed the fifth and sixth models to be best, with the lowest SSE. Looking at the fifth model we had a strong $R^2$ of 0.8900757 and similarly strong adjusted $R^2$ of 0.8864039, indicating that the model did not overfit and strongly explained much of the variance. It should be noted however that diagnostic plots were not promising with the fitted values versus residuals plot not looking random on the left hand side and the standardized residuals not following a normal distribution apparently. This could compromise the model.
+Comparison on the testing data revealed the fifth and sixth models to be best, with the lowest SSE. Looking at the fifth model we had a strong $R^2$ of 0.9443243 and similarly strong adjusted $R^2$ of 0.9424646, indicating that the model did not overfit and strongly explained much of the variance. It should be noted however that diagnostic plots were not promising with the fitted values versus residuals plot not looking random on the left hand side (although it was well spaced as fiited values increased) and the standardized residuals not following a normal distribution. Moreover, an non constant variance test indicated heteroscedasticity, with p value <2.22e-16. These violations of linear regression assumptions could compromise the model.
 
 ![](images/m2.png){#id .class width=80% height=80%}
 
@@ -522,6 +542,24 @@ Comparison on the testing data revealed the fifth and sixth models to be best, w
 
 ![](images/m2a.png){#id .class width=50% height=50%}
 ![](images/m2b.png){#id .class width=50% height=50%}
+![](images/m2c.png){#id .class width=50% height=50%}
+
+# Evaluation and Conclusion
+
+## Overall comment
+
+This project hopefully shared some insight as to the distribution of COVID-19 deathrates and deathtolls, and led to some ideas of the root factors at play with the constructed models. Although deathrates frequency was succesfully modelled by a Burr distribution, probability distributions are likely not enough to successfully model and predict  deathtolls. As such regression models are likely the way to go for better modelling. This project concluded with a not so successful attempt at this with a logistic regression for deathrates, but with also a good cumulative deaths model being developed.
+
+## Future work
+
+The deathtoll models were plagued with diagnostic errors, implying that assumptions of standard linear regressions were being violated. It is possible to adjust the coefficents of one's model using the $sandwich$ library, such that the assumptions of standard linear regression are met. This would clearly be something wise to do for greater application of any developed model.
+
+Moreover, it could be interesting to look at and evaluate each coefficient in the model, and explain this from a biological/ epidemiological perspective. This could potentially help policy-makers better deal with the current outbreak and future ones.
+
+Furthermore, the current model could use more variables! For instance a new dummy variable could be used to indicate whether quarantine restrictions are in place. This example in particular could help determine whether restrictions are effective. Indeed this and more variables would likely let the model explain more of the variance.
+
+Finally, building a more in depth interlinked model system could be advantageous. One could perceive modelling susceptible individuals, and from that infectious individuals and then from that recovered individuals. This 3-way system would cover the main principles of how a virus spreads, and could potentially lead to dynamic simulations and more accurate models. 
+
 
 
 

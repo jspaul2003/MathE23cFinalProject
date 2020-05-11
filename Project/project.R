@@ -78,6 +78,11 @@ library(glmnet)
 library(miscTools)
 #install.packages("sandwich")
 library(sandwich)
+#install.packages("actuar")
+library(actuar)
+#install.packages("lindia")
+library(lindia)
+
 
 #SETTING SEED FOR CONSISTENT RESULTS
 set.seed(3.141592)
@@ -258,12 +263,16 @@ normalize=function(x){
 
 #testlassoridge:
 #runs diagnostics for normality of residuals and plots residual
-#fitted values plots. This is for deathrate modelling.
+#fitted values plots. This is for deathrate modelling. 
 testlassoridge=function(fits){
   residuals=train.data$deathrate-fits
   plot(fits[1:length(fits)]~residuals[1:length(residuals)])
-  return(shapiro.test(residuals[1:length(residuals)]))
+  print("Shapiro Wilk for Normalitt of residuals")
+  print(shapiro.test(residuals[1:length(residuals)]))
 }
+
+
+
 
 #testlassoridge1:
 #runs diagnostics for normality of residuals and plots residual
@@ -271,7 +280,8 @@ testlassoridge=function(fits){
 testlassoridge1=function(fits){
   residuals=train.data$deaths-fits
   plot(fits[1:length(fits)]~residuals[1:length(residuals)])
-  return(shapiro.test(residuals[1:length(residuals)]))
+  print("Shapiro Wilk for Normalitt of residuals")
+  print(shapiro.test(residuals[1:length(residuals)]))
 }
 
 
@@ -409,7 +419,9 @@ fitdistr(world$deaths2, "poisson")
 model=world$active*0.17*ppois(1:nrow(world), 16.68705)
 ggbar(world$deaths2,model)
 
-#Seems just as weak as the binomial model.
+#Seems just as weak as the binomial model. They look nearly identical. Unsuprising as 
+#the binomial tends to the poisson in the limit of large n given many samples and provided 
+#that they are approximately independent
 
 
 #II)
@@ -428,7 +440,7 @@ p
 
 #Lets try modelling with a gamma function
 #we can use fitdistr to give us our parameters for the gamma distribution
-fitdistr(geographicdata$deathrate[which(geographicdata$deaths2!=0)], "gamma")
+fitdistr(toplot$deathrate, "gamma")
 p+stat_function(fun=dgamma, args=list(shape=1.06011822, rate=21.99330112),col="red")+xlim(0,1)
 #Seems good
 
@@ -437,7 +449,7 @@ p+stat_function(fun=dgamma, args=list(shape=1.06011822, rate=21.99330112),col="r
 #create bins by breaking data into deciles
 bins=qgamma(0.1*(0:10),1.06011822 ,21.99330112)
 
-binstuff=cut(geographicdata$deathrate[which(geographicdata$deaths2!=0)], breaks=bins,labels=F); binstuff
+binstuff=cut(toplot$deathrate, breaks=bins,labels=F); binstuff
 
 obs=as.vector(table(binstuff))
 
@@ -456,6 +468,21 @@ pval=pchisq(chisq,df=7,lower.tail = F); pval
 #data follows a gamma distribution.
 
 
+#We could try the heavy tail Burr distribution
+
+fitdist(toplot$deathrate,"burr",start=list(shape1=0.01,shape2=0.01,rate=0.01))
+
+p+stat_function(fun=dburr, args=list(shape1=2.010724,shape2=1.354063,rate=16.967252 ),col="red")+xlim(0,1)
+
+p=0
+for(i in 1:1000){
+  p=p+ks.test(toplot$deathrate,rburr(nrow(toplot)*5,shape1=2.010724,shape2=1.354063,rate=16.967252))[[2]]
+}
+p/1000
+
+#We got a p-value of 0.07323082. we thus fail to reject the null hypothesis at the 0.05 level 
+#of significancethat the sample came from the relevant distribution, and conclude that death 
+#rate counts can be approximated with the Burr distribution!
 
 
 
@@ -471,7 +498,7 @@ pval=pchisq(chisq,df=7,lower.tail = F); pval
 #We will check via a permutation test and t test to confirm.
 #(REQ: A permutation test, Comparison of analysis by classical methods (chi-square, 
 #CLT) and simulation methods, An example where permutation tests or other computational 
-#techniques clearly work better than classical methods Nicely labeled graphics using 
+#techniques clearly work better than classical methods, Nicely labeled graphics using 
 #ggplot, with good use of color, line styles...)
 
 rich=which(data2$Rich==1)
@@ -600,15 +627,28 @@ coord_fixed()
 
 #I)
 #Modelling deathrate via logistic regression.
-#lets train some models on a random sample of 30% of the data
-#and then test on the rest of the sample.
-#then we can compare fitted SSE to determine best model
-#(REQ: Logistic Regression)
+#(REQ: Calculation and display of a logistic regression curve, Nicely labeled 
+#graphics using ggplot, with good use of color, line styles...)
 
 temp <- subset(data2, select = -c(Country,countriesAndTerritories, geoId, countryterritoryCode, continentExp, Date, day, month, year, hdr, Entity, Code, dateRep))
 
 #would be unfair to feed death data here
 temp2=subset(temp,select=-c(deaths,deaths2,active))
+
+
+#How good is a univariate regression model for deathrate using recoveries only?
+fit=glm(deathrate~recoveries,data=temp2,family="binomial")
+predicted_df <- data.frame(pred = predict.glm(fit, temp2,type = "response"))
+ggplot(data2, aes(y=deathrate,x=data2$recoveries))+geom_point()+geom_line(color='red',data = predicted_df, aes(y=pred))
+r2 <- rSquared(temp2$deathrate, resid = temp2$deathrate-predicted_df$pred)
+#clearly the univariate model is poor as reflected on the abysmal R^2 of 
+#0.06582144
+
+
+#We will likely have better chances with multiple logistic regression.
+#Lets train some models on a random sample of 80% of the data
+#and then test on the rest of the sample.
+#then we can compare fitted SSE to determine best model
 
 boxplot(temp2)
 #there seems to be major spread of outliers and general spread in
@@ -670,36 +710,31 @@ vif(fit)
 summary(fit)
 plot(fit)
 
-#diagnostic plots dont look promising, residuals vs fitted not totally
-#random, standardized residuals seem to follow normal distribution quite well
-#though
-#R2
+#Cook's distance looks ok
 
 
 #model 2
-fit2=glm(deathrate~.^2,data=train.data,family="binomial"); summary(fit4)
+fit2=glm(deathrate~.^2,data=train.data,family="binomial"); summary(fit2)
 plot(fit2)
+#NAs in coefficients=> variables in question being linearly related to the other variables
+#not a problem here though because we have interaction terms:
+#https://statisticalhorizons.com/multicollinearity
 
-#diagnostic plots dont look promising, residuals vs fitted not 
-#random, standardized residuals dont seem to follow normal distribution well, one
-#value outside cook's distance
+#Cook's distance plot raises some issues with points especially 1984 
 
 
 #model 3
 fit3=stepwise(fit,direction="backward/forward",criterion="AIC", trace=F)
 plot(fit3)
 
-#diagnostic plots dont look promising, residuals vs fitted not 
-#random, standardized residuals dont seem to follow normal distribution well
+#Cook's distance looks ok
 
 
 #model 4
 fit4=stepwise(fit,direction="backward/forward",criterion="BIC", trace= F)
 plot(fit4)
 
-#diagnostic plots dont look promising, residuals vs fitted not 
-#random, standardized residuals dont seem to follow normal distribution well
-
+#Cook's distance looks ok
 
 #model 5, LASSO Model
 X = model.matrix(deathrate~.,train.data )[,-1]
@@ -709,8 +744,9 @@ model=glmnet(X,Y,alpha =1, lambda=cv$lambda.min)
 
 X1=cbind(1,X)
 testlassoridge(X1%*%coef(model));
-#plot doesent look random
-#we received p-value <2.2e-16 in the shapiro wilk test for normality
+#plot doesent look random esp on left side. Doesent seem to be a clear cone shape
+#in plot implying no heteroskedacity 
+#we received p-value <1.520505e-28 in the shapiro wilk test for normality
 #meaning that we reject the null hypothesis of no significant difference
 #with the normal distribution, and conclude that under the current 
 #evidence, the residuals do not follow a normal distribution
@@ -721,7 +757,7 @@ model2=glmnet(X,Y,alpha =0, lambda=cv$lambda.min)
 
 testlassoridge(X1%*%coef(model2))
 #doesent look random on bottom left hand side
-#we received p-value <2.2e-16 in the shapiro wilk test for normality
+#we received p-value 2.225371e-32 in the shapiro wilk test for normality
 #meaning that we reject the null hypothesis of no significant difference
 #with the normal distribution, and conclude that under the current 
 #evidence, the residuals do not follow a normal distribution
@@ -742,10 +778,10 @@ fit8=mean(train.data$deathrate)
 #that we removed in training
 test.data=test.data[which(colnames(test.data)%in%colnames(train.data))]
 
-sse1=sum(test.data$deathrate-predict(fit,new=test.data))^2
-sse2=sum(test.data$deathrate-predict(fit2,new=test.data))^2
-sse3=sum(test.data$deathrate-predict(fit3,new=test.data))^2
-sse4=sum(test.data$deathrate-predict(fit4,new=test.data))^2
+sse1=sum(test.data$deathrate-predict.glm(fit,new=test.data,type="response"))^2
+sse2=sum(test.data$deathrate-predict.glm(fit2,new=test.data,type="response"))^2
+sse3=sum(test.data$deathrate-predict.glm(fit3,new=test.data,type="response"))^2
+sse4=sum(test.data$deathrate-predict.glm(fit4,new=test.data,type="response"))^2
 
 X.test = model.matrix(deathrate~.,test.data )
 fits = X.test%*%coef(model)
@@ -762,16 +798,22 @@ sse8=sum(test.data$deathrat-fit8)^2
 
 c(mean(sse1),mean(sse2),mean(sse3),mean(sse4),mean(sse5),mean(sse6),mean(sse7),mean(sse8))/(nrow(test.data))
 
-#The 6th model was the best with lowest SSE 9.725754e-05; (Ridge)
+#The Second model is best with lowest SSE 7.507951e-05
 
-r2 <- rSquared(test.data$deathrate, resid = as.matrix(test.data$deathrate-(X.test%*%coef(model2))))
-#pretty bad 0.4729924 R^2; not accounting for adjusted R^2 considering we
+r2 <- rSquared(test.data$deathrate, resid = test.data$deathrate-predict.glm(fit2,new=test.data,type="response")); r2
+#pretty bad 0.5249956 R^2; not accounting for adjusted R^2 considering we
 #have many variables
 #adjusted R^2
 n=nrow(test.data)
 k=nrow(coef(model2))-1
 1-((1-r2)*(n-1))/(n-k-1)
-#about the same 0.4519564, still not great though
+#about the same, still not great though
+
+
+
+
+
+
 
 
 #II)
@@ -812,33 +854,48 @@ vif(fit)
 #looking good, we have our first model
 summary(fit)
 plot(fit)
+ncvTest(fit)
 #diagnostic plots dont look promising, residuals vs fitted not totally
 #random, standardized residuals dont seem to follow normal distribution well
+#cook's distance plot looks good. ncvTest results in p-value < 2.22e-16 implying 
+#heteroscedasticity
 
 #model 2
 fit2=stepwise(fit,direction='forward/backward',criterion='BIC',trace='false'); summary(fit2)
 plot(fit2)
+ncvTest(fit2)
 #diagnostic plots dont look promising, residuals vs fitted not totally
 #random, standardized residuals dont seem to follow normal distribution well
+#cook's distance plot looks good. ncvTest results in p-value < 2.22e-16 implying 
+#heteroscedasticity
 
 #model 3
 fit3=stepwise(fit,direction='forward/backward',criterion='AIC',trace='false'); summary(fit3)
 plot(fit3)
+ncvTest(fit3)
 #diagnostic plots dont look promising, residuals vs fitted not totally
 #random, standardized residuals dont seem to follow normal distribution well
+#cook's distance plot looks good. ncvTest results in p-value < 2.22e-16 implying 
+#heteroscedasticity
 
 #model 4
 fit4=lm(deaths~.^2,data=train.data)
 plot(fit4)
+ncvTest(fit4)
 #diagnostic plots seem better, residuals vs fitted not totally
 #random at lower fitted values, but well spaced as this gets higher,
 #standardized residuals dont seem to follow normal distribution well
+#Point 2913 looks poor on cook's plot. ncvTest results in p-value 
+#< 2.22e-16 implying heteroscedasticity
 
 #model 5
 fit5=stepwise(fit4,direction='forward/backward',criterion='AIC',trace='false'); summary(fit3)
 plot(fit5)
-#diagnostic plots dont look promising, residuals vs fitted not totally
-#random, standardized residuals dont seem to follow normal distribution well
+ncvTest(fit5)
+#residuals vs fitted not totally random, especially on left side
+#standardized residuals dont seem to follow normal distribution well
+#cook's distance plot looks good. ncvTest results in p-value < 2.22e-16 implying 
+#heteroscedasticity
 
 #model 6
 fit6=stepwise(fit4,direction='forward/backward',criterion='AIC',trace='false'); summary(fit3)
@@ -846,6 +903,8 @@ plot(fit6)
 #diagnostic plots seem better, residuals vs fitted not totally
 #random at lower fitted values, but well spaced as this gets higher,
 #standardized residuals dont seem to follow normal distribution well
+#cook's distance plot looks good. ncvTest results in p-value < 2.22e-16 implying 
+#heteroscedasticity
 
 #model 7, LASSO Model
 X = model.matrix(deaths~.,train.data )[,-1]
@@ -856,7 +915,7 @@ model=glmnet(X,Y,alpha =1, lambda=cv$lambda.min)
 X1=cbind(1,X)
 testlassoridge1(X1%*%coef(model));
 #plot doesent look random esp on bottom left hand side
-#we received p-value <2.2e-16 in the shapiro wilk test for normality
+#we received p-value 3.270827e-49 in the shapiro wilk test for normality
 #meaning that we reject the null hypothesis of no significant difference
 #with the normal distribution, and conclude that under the current 
 #evidence, the residuals do not follow a normal distribution
@@ -867,7 +926,7 @@ model2=glmnet(X,Y,alpha =0, lambda=cv$lambda.min)
 
 testlassoridge1(X1%*%coef(model2));
 #plot doesent look random esp on bottom left hand side
-#we received p-value <2.2e-16 in the shapiro wilk test for normality
+#we received p-value <1.980456e-52 in the shapiro wilk test for normality
 #meaning that we reject the null hypothesis of no significant difference
 #with the normal distribution, and conclude that under the current 
 #evidence, the residuals do not follow a normal distribution
@@ -876,9 +935,6 @@ testlassoridge1(X1%*%coef(model2));
 #we need to normalize the data
 ntrain.data=as.data.frame(lapply(train.data,normalize))
 nn=neuralnet(deaths ~ .-cases , data=ntrain.data, hidden=c(16,25), linear.output =T, threshold=0.1)
-#dropping cases or else get:
-#Error: the error derivative contains a NA; varify that the derivative function 
-#does not divide by 0 (e.g. cross entropy)
 
 #which shouldnt be possible as probability never 0 implying this column led
 #R to rounding some really small number
@@ -914,17 +970,15 @@ c(mean(sse1),mean(sse2),mean(sse3),mean(sse4),mean(sse5),mean(sse6),mean(sse7),m
 
 
 r2 <- rSquared(test.data$deaths, resid = test.data$deaths-predict(fit5,new=test.data)); r2
-#0.8900757
+#0.9443243
 
-#pretty great 0.8881653 R^2; not accounting for adjusted R^2 considering we
+#pretty great 0.9443243 R^2; not accounting for adjusted R^2 considering we
 #have many variables
 #adjusted R^2
 n=nrow(test.data)
 k=nrow(coef(model2))-1
 1-((1-r2)*(n-1))/(n-k-1)
-#about the same,  0.8864039, this is pretty great!
-
-
+#about the same,  0.9424646, this is pretty great!
 
 
 
