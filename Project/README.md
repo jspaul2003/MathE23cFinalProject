@@ -1,6 +1,8 @@
 # MathE23cFinalProject
 TO DO:
 
-Write up
+checking
+
+ethics write up ugh
 
 youtube video?

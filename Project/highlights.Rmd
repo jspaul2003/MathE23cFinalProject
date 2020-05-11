@@ -445,7 +445,7 @@ As such a Permutation test was to be used to test for significant mean differenc
 p+geom_vline(xintercept =deathRateDif,col="blue")
 ```
 
-There is a 4.199958% chance of discrepency by chance (by the p-value extracted from the test). We reject the null hypothesis of no mean difference at the 0.05 level of significance. This leads to suprising conclusion that richer countries have higher COVID-19 Deathrates. This is probably because poorer countries have less testing and are therefore less able to determine who has died from COVID-19, to such an extent that this would occur. The significant difference could be promising for modelling in topic 3 later on.
+There is a 4.199958% chance of discrepency by chance (by the p-value extracted from the test). We reject the null hypothesis of no mean difference at the 0.05 level of significance. This leads to suprising conclusion that richer countries have higher COVID-19 Deathrates. This is probably because poorer countries have less testing and are therefore less able to determine who has died from COVID-19, to such a great extent. The significant difference could be promising for modelling in topic 3 later on.
 
 
 ## Part 2: Are crime and high death rates independent?
@@ -488,7 +488,7 @@ ggplot(data = melted_cormat, aes(Var2, Var1, fill = value))+
 coord_fixed()
 ```
 
-Death rate is actually not strongly correlated much at all with the other variables. Interestingly, we dont see high degrees of  similarity. Perhaps this indicates that deathrate is relatively constant and hard to model. This indicates challenges for topic 3.
+Death rate is actually not strongly correlated much at all with the other variables. Perhaps this indicates that deathrate is relatively constant and hard to model. This indicates challenges for topic 3. Interestingly, we dont see high degrees of similarity overall. 
 
 # Topic 3: Modelling deathrate and deathtoll
 
@@ -530,7 +530,7 @@ To reduce spread of outliers: $GDP.2018$, $Population.2020$, $Total.tests$ were 
 
 In order to deal with multicollinearity, the following were dropped one by one from the numeric data in accordance with their variance inflation factors: $lung$, $sex54$, $Sex.Ratio$, $sex64$, $Females.2018$, $Population.2020$, $days$, $recoveries$, $Male.Lung$, $sex0$. This led to only these variables being used in modelling: $Density$, $Urban.Pop$, $Hospital.Bed$, $sex14$, $sex25$, $sex65plus$, $Female.Lung$, $Median.Age$, $GDP.2018$, $Crime.Index$, $Smoking.2016$,  $cases$, $cases2, $Total.tests$, $Rich$, $Crime$.  
 
-The first model was a linear regression of deathrate onto all the available variables. The second model was a forward/backward stepwise regression model on the first model with AIC criterion. The third model was a forward/backward stepwise regression model on the first model with BIC criterion The fourth model was a logistic regression model of deathrate onto the interaction terms of all the available variables to the second power. The fifth model was a forward/backward stepwise regression model on the fourth model with AIC criterion. The sixth model was a forward/backward stepwise regression model on the fourth model with BIC criterion The seventh model was a lasso model of deathrate onto all the available variables. The eighth model was a lasso model of deathrate onto all the available variables. The ninth model was a neural net with threshold 0.1 of deathrate onto all the available variables. 
+The first model was a linear regression of new deaths onto all the available variables. The second model was a forward/backward stepwise regression model on the first model with AIC criterion. The third model was a forward/backward stepwise regression model on the first model with BIC criterion The fourth model was a linear regression model of new deaths onto the interaction terms of all the available variables to the second power. The fifth model was a forward/backward stepwise regression model on the fourth model with AIC criterion. The sixth model was a forward/backward stepwise regression model on the fourth model with BIC criterion The seventh model was a lasso model of new deaths onto all the available variables. The eighth model was a lasso model of new deaths onto all the available variables. The ninth model was a neural net with threshold 0.1 of deathrate onto all the available variables. 
 
 Comparison on the testing data revealed the fifth and sixth models to be best, with the lowest SSE. Looking at the fifth model we had a strong $R^2$ of 0.9443243 and similarly strong adjusted $R^2$ of 0.9424646, indicating that the model did not overfit and strongly explained much of the variance. It should be noted however that diagnostic plots were not promising with the fitted values versus residuals plot not looking random on the left hand side (although it was well spaced as fiited values increased) and the standardized residuals not following a normal distribution. Moreover, an non constant variance test indicated heteroscedasticity, with p value <2.22e-16. These violations of linear regression assumptions could compromise the model.
 
@@ -548,11 +548,11 @@ Comparison on the testing data revealed the fifth and sixth models to be best, w
 
 ## Overall comment
 
-This project hopefully shared some insight as to the distribution of COVID-19 deathrates and deathtolls, and led to some ideas of the root factors at play with the constructed models. Although deathrates frequency was succesfully modelled by a Burr distribution, probability distributions are likely not enough to successfully model and predict  deathtolls. As such regression models are likely the way to go for better modelling. This project concluded with a not so successful attempt at this with a logistic regression for deathrates, but with also a good cumulative deaths model being developed.
+This project hopefully shared some insight as to the distribution of COVID-19 deathrates and deathtolls, and led to some ideas of the root factors at play with the constructed models. Although deathrates frequency was succesfully modelled by a Burr distribution, probability distributions are likely not enough to successfully model and predict  deathtolls. As such regression models are likely the way to go for better modelling. This project concluded with a not so successful attempt at this with a logistic regression for deathrates, but with also a good new deaths model being developed.
 
 ## Future work
 
-The deathtoll models were plagued with diagnostic errors, implying that assumptions of standard linear regressions were being violated. It is possible to adjust the coefficents of one's model using the $sandwich$ library, such that the assumptions of standard linear regression are met. This would clearly be something wise to do for greater application of any developed model.
+The death models were plagued with diagnostic errors, implying that assumptions of standard linear regressions were being violated. It is possible to adjust the coefficents of one's model using the $sandwich$ library, such that the assumptions of standard linear regression are met. This would clearly be something wise to do for greater application of any developed model.
 
 Moreover, it could be interesting to look at and evaluate each coefficient in the model, and explain this from a biological/ epidemiological perspective. This could potentially help policy-makers better deal with the current outbreak and future ones.
 

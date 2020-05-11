@@ -80,8 +80,6 @@ library(miscTools)
 library(sandwich)
 #install.packages("actuar")
 library(actuar)
-#install.packages("lindia")
-library(lindia)
 
 
 #SETTING SEED FOR CONSISTENT RESULTS
@@ -817,7 +815,7 @@ k=nrow(coef(model2))-1
 
 
 #II)
-#Can we do a better job modelling the total deaths?
+#Can we do a better job modelling new deaths?
 #(REQ: Use of linear regression)
 
 temp2=subset(temp,select=-c(deaths2,deathrate,active))
