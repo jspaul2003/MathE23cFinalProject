@@ -80,12 +80,12 @@ library(miscTools)
 library(sandwich)
 #install.packages("actuar")
 library(actuar)
+#install.packages("DescTools")
+library(DescTools)
 
 
 #SETTING SEED FOR CONSISTENT RESULTS
 set.seed(3.141592)
-
-
 
 
 
@@ -265,7 +265,7 @@ normalize=function(x){
 testlassoridge=function(fits){
   residuals=train.data$deathrate-fits
   plot(fits[1:length(fits)]~residuals[1:length(residuals)])
-  print("Shapiro Wilk for Normalitt of residuals")
+  print("Shapiro Wilk for Normality of residuals")
   print(shapiro.test(residuals[1:length(residuals)]))
 }
 
@@ -628,21 +628,33 @@ coord_fixed()
 #(REQ: Calculation and display of a logistic regression curve, Nicely labeled 
 #graphics using ggplot, with good use of color, line styles...)
 
-temp <- subset(data2, select = -c(Country,countriesAndTerritories, geoId, countryterritoryCode, continentExp, Date, day, month, year, hdr, Entity, Code, dateRep))
+#we will model bernoulli variable hdr already defined above
+
+temp <- subset(data2, select = -c(Country,countriesAndTerritories, geoId, countryterritoryCode, continentExp, Date, day, month, year, Entity, Code, dateRep))
 
 #would be unfair to feed death data here
 temp2=subset(temp,select=-c(deaths,deaths2,active))
 
 
 #How good is a univariate regression model for deathrate using recoveries only?
-fit=glm(deathrate~recoveries,data=temp2,family="binomial")
+fit=glm(hdr~recoveries,data=temp2,family="binomial")
 predicted_df <- data.frame(pred = predict.glm(fit, temp2,type = "response"))
-ggplot(data2, aes(y=deathrate,x=data2$recoveries))+geom_point()+geom_line(color='red',data = predicted_df, aes(y=pred))
-r2 <- rSquared(temp2$deathrate, resid = temp2$deathrate-predicted_df$pred)
-#clearly the univariate model is poor as reflected on the abysmal R^2 of 
-#0.06582144
+ggplot(data2, aes(y=hdr,x=data2$recoveries))+geom_point()+geom_line(color='red',data = predicted_df, aes(y=pred))
+
+#univariate model doesent look great
+PseudoR2(fit,which=c("McFadden"))
+#This is reflected in the poor McFadden Pseudo-R squared value
+#indicating recoveries explain very little of the variance in high death rates
 
 
+
+
+
+
+
+
+
+temp2=subset(temp,select=-c(hdr))
 #We will likely have better chances with multiple logistic regression.
 #Lets train some models on a random sample of 80% of the data
 #and then test on the rest of the sample.
@@ -696,12 +708,12 @@ while(length!=ncol(train.data)){
 
 vif(fit)
 
-#Male.lung seems quite high; although not 10 its very close to it. I will drop
-#this as such
-train.data=subset(train.data,select = -c(Male.Lung))
-fit=glm(deathrate~.,data=train.data,family="binomial")
 
-vif(fit)
+
+
+
+
+
 
 
 #Seems good-we now have our first model
@@ -718,7 +730,7 @@ plot(fit2)
 #not a problem here though because we have interaction terms:
 #https://statisticalhorizons.com/multicollinearity
 
-#Cook's distance plot raises some issues with points especially 1984 
+#Cook's distance plot raises major issues
 
 
 #model 3
@@ -742,8 +754,8 @@ model=glmnet(X,Y,alpha =1, lambda=cv$lambda.min)
 
 X1=cbind(1,X)
 testlassoridge(X1%*%coef(model));
-#plot doesent look random esp on left side. Doesent seem to be a clear cone shape
-#in plot implying no heteroskedacity 
+#plot doesent look random  on left side. Seems to be some indication
+#of heteroskedacity 
 #we received p-value <1.520505e-28 in the shapiro wilk test for normality
 #meaning that we reject the null hypothesis of no significant difference
 #with the normal distribution, and conclude that under the current 
@@ -758,7 +770,7 @@ testlassoridge(X1%*%coef(model2))
 #we received p-value 2.225371e-32 in the shapiro wilk test for normality
 #meaning that we reject the null hypothesis of no significant difference
 #with the normal distribution, and conclude that under the current 
-#evidence, the residuals do not follow a normal distribution
+#evidence, the residuals do not follow a normal distribution. also seems to be indication of heteroskedacity from plot
 
 #model 7, neural net
 #we need to normalize the data
@@ -796,22 +808,16 @@ sse8=sum(test.data$deathrat-fit8)^2
 
 c(mean(sse1),mean(sse2),mean(sse3),mean(sse4),mean(sse5),mean(sse6),mean(sse7),mean(sse8))/(nrow(test.data))
 
-#The Second model is best with lowest SSE 7.507951e-05
+#The fifth model (Linear Lasso) is best with lowest SSE 1.200977e-06
 
-r2 <- rSquared(test.data$deathrate, resid = test.data$deathrate-predict.glm(fit2,new=test.data,type="response")); r2
-#pretty bad 0.5249956 R^2; not accounting for adjusted R^2 considering we
+r2 <- rSquared(test.data$deathrate, resid = as.matrix(test.data$deathrate-fits)); r2
+#pretty bad 0.5543442 R^2; not accounting for adjusted R^2 considering we
 #have many variables
 #adjusted R^2
 n=nrow(test.data)
-k=nrow(coef(model2))-1
+k=nrow(coef(model))-1
 1-((1-r2)*(n-1))/(n-k-1)
-#about the same, still not great though
-
-
-
-
-
-
+#about the same at 0.5346, still not great though
 
 
 #II)
@@ -883,7 +889,7 @@ ncvTest(fit4)
 #diagnostic plots seem better, residuals vs fitted not totally
 #random at lower fitted values, but well spaced as this gets higher,
 #standardized residuals dont seem to follow normal distribution well
-#Point 2913 looks poor on cook's plot. ncvTest results in p-value 
+#Points 8939, 8952 look poor on cook's plot. ncvTest results in p-value 
 #< 2.22e-16 implying heteroscedasticity
 
 #model 5
@@ -892,7 +898,7 @@ plot(fit5)
 ncvTest(fit5)
 #residuals vs fitted not totally random, especially on left side
 #standardized residuals dont seem to follow normal distribution well
-#cook's distance plot looks good. ncvTest results in p-value < 2.22e-16 implying 
+#cook's distance plot looks fine. ncvTest results in p-value < 2.22e-16 implying 
 #heteroscedasticity
 
 #model 6
@@ -968,15 +974,12 @@ c(mean(sse1),mean(sse2),mean(sse3),mean(sse4),mean(sse5),mean(sse6),mean(sse7),m
 
 
 r2 <- rSquared(test.data$deaths, resid = test.data$deaths-predict(fit5,new=test.data)); r2
-#0.9443243
+#0.8887649
 
-#pretty great 0.9443243 R^2; not accounting for adjusted R^2 considering we
+#pretty great 0.8887649 R^2; not accounting for adjusted R^2 considering we
 #have many variables
 #adjusted R^2
 n=nrow(test.data)
-k=nrow(coef(model2))-1
+k=length(coef(fit5))-1
 1-((1-r2)*(n-1))/(n-k-1)
-#about the same,  0.9424646, this is pretty great!
-
-
-
+#about the same,  0.8848089, this is pretty great!
