@@ -1,0 +1,36 @@
+---
+title: "Ethical issues with COVID-19 data collection"
+author: "Jean-Sebastien Paul"
+date: "11/05/2020"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Data
+
+We need COVID-19 data to develop models to better adapt to the outbreak. Doctors need it to make better, critical decisions. However, one must note the right of individuals to privacy and the ability to consent to data sharing and knowledge of how that data is shared. 
+
+This can be challenging in the current outbreak where we need to weigh the potential benefits of more accurate and greater data collection which could save lives. This leads to the debate of what is best for the individual and he/she's human rights against what is best for society. As Kant said autonomy and freedom is necessary for an individual to be a "person", and it would be immoral to take that away. However this would directly contradict a Bentham utilitarian philosophy where the "greatest happiness" might not be generated in this case.
+
+The dataset used thankfully should be muted in this aspect however, with no personally identifying data within all counted individuals, and the positives of the shared data outweighing the null or at least negligble negatives, hopefully meaning most if not all would have consented freely to being marked down as infected or not.
+
+Another potential issue is how data is shared. Some parties may not be willing to share data for free; since collection might have come at a cost. It would perhaps seem unfair to take away their freedom and financially cost such parties by imposing data sharing regulation. However in the face of the loss of human life, that data morally, should be shared to help as many as possible, and in the worst case this cost could be repaid by the government should that data be extremely expensive and useful.
+
+Again, the dataset used here is fortunately very open and very accessible, with many parties willing to share COVID-19 count data freely, and other predictor data already in the public domain even before the outbreak began. There should be no ethical qualms here.
+
+
+# What should we be looking at
+
+At present, we look at death counts as an indication of how bad the epidemic is. However this may not be the correct the way to look at the overall cost. Rather, perhaps we should be looking at how many years of life expectancy are lost. Plainly, those who die from COVID-19 are typically the elderly or those with underlying health conditions who will ultimately have less years to live overall by life expectancy. From this perspective therefore, the crisis might not be as bad as the death toll numbers make it out to be. This could mean restrictions in place are not overall worth it to society for some due to what might be perceived to be as an actual lower cost. It might also make the data collected and conclusions reached in this project fundementally flawed (as it will be looking only at the death counts).
+
+This is a sensitive subject, but it is clear, from an ethical standpoint, that whatever can be done to save as much lives as possible should be enacted whenever possible.
+
+
+
+
+

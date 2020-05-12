@@ -1,12 +1,12 @@
 #FINAL PROJECT MATH E-23C
 
-#JEAN-SEBASTIEN PAUL
+#JEAN-SEBASTIEN PAUL (working alone)
 #EXPLORING COVID-19 DEATHRATES AND DEATHTOLL
 
 
 #GLOBAL OPTIONS:
 
-#This is done to get rid of irrelevant warnings, especially
+#This is done to get rid of unimportant warnings, especially
 #the logistic regression warning where fitted probabilities
 #numerically 0 or 1 occurred, which doesent matter.
 options(warn=-1)
@@ -18,6 +18,11 @@ options(warn=-1)
 
 #Correlation heatmap code learnt from:
 #http://www.sthda.com/english/wiki/ggplot2-quick-correlation-matrix-heatmap-r-software-and-data-visualization
+
+#youtube video at https://www.youtube.com/watch?v=zeiuhN8DBfE
+#linear regression and logistic regression model building code 
+#will likely result in different models for you due to how the training
+#and testing sampling system works.
 
 
 #PACKAGES:
@@ -612,7 +617,7 @@ ggplot(data = melted_cormat, aes(Var2, Var1, fill = value))+
 coord_fixed()
 
 #Death rate actually isnt strongly correlated much at all
-#with the other variables. Interestingly, we dont see high degrees of 
+#with the other predictive variables. Interestingly, we dont see high degrees of 
 #similarity. Perhaps this indicates that deathrate is relatively constant.
 
 
@@ -654,7 +659,7 @@ PseudoR2(fit,which=c("McFadden"))
 
 
 
-temp2=subset(temp,select=-c(hdr))
+temp2=subset(temp2,select=-c(hdr))
 #We will likely have better chances with multiple logistic regression.
 #Lets train some models on a random sample of 80% of the data
 #and then test on the rest of the sample.
@@ -692,6 +697,7 @@ sample <-sample.int(n =nrow(temp2),size =floor(.80*nrow(temp2)), replace = F)
 train.data <- temp2[sample, ]
 test.data <-temp2[-sample,]
 train.data=drop_na(train.data)
+test.data=drop_na(test.data)
 
 fit=glm(deathrate~.,data=train.data,family="binomial")
 
@@ -737,7 +743,7 @@ plot(fit2)
 fit3=stepwise(fit,direction="backward/forward",criterion="AIC", trace=F)
 plot(fit3)
 
-#Cook's distance looks ok
+#Cook's distance looks somewhat worrying but overall fine
 
 
 #model 4
@@ -779,8 +785,6 @@ ntrain.data=as.data.frame(lapply(train.data2,normalize))
 ntrain.data=drop_na(ntrain.data)
 nn=neuralnet(deathrate ~ ., data=ntrain.data, hidden=c(16,25), linear.output =T, threshold=0.1)
 
-#model 8, the constant
-fit8=mean(train.data$deathrate)
 
 #Now Lets test accuracy!
 #We will look at SSE
@@ -803,28 +807,27 @@ sse6=sum(test.data$deathrate-fits2)^2
 nn.results <- compute(nn, test.data)
 sse7=sum(test.data$deathrate-nn.results$net.result)^2
 
-sse8=sum(test.data$deathrat-fit8)^2
 
 
-c(mean(sse1),mean(sse2),mean(sse3),mean(sse4),mean(sse5),mean(sse6),mean(sse7),mean(sse8))/(nrow(test.data))
+c(mean(sse1),mean(sse2),mean(sse3),mean(sse4),mean(sse5),mean(sse6),mean(sse7))/(nrow(test.data))
 
 #The fifth model (Linear Lasso) is best with lowest SSE 1.200977e-06
 
 r2 <- rSquared(test.data$deathrate, resid = as.matrix(test.data$deathrate-fits)); r2
-#pretty bad 0.5543442 R^2; not accounting for adjusted R^2 considering we
+#pretty bad 0.4917774 R^2; not accounting for adjusted R^2 considering we
 #have many variables
 #adjusted R^2
 n=nrow(test.data)
 k=nrow(coef(model))-1
 1-((1-r2)*(n-1))/(n-k-1)
-#about the same at 0.5346, still not great though
+#about the same at 0.4703785, still not great though
 
 
 #II)
 #Can we do a better job modelling new deaths?
 #(REQ: Use of linear regression)
 
-temp2=subset(temp,select=-c(deaths2,deathrate,active))
+temp2=subset(temp,select=-c(deaths2,deathrate,active,hdr))
 
 #we can run same code to deal with spread of outliers
 temp2$GDP.2018=I(log(temp2$GDP))
@@ -841,6 +844,7 @@ sample <-sample.int(n =nrow(temp2),size =floor(.80*nrow(temp2)), replace = F)
 train.data <- temp2[sample, ]
 test.data <-temp2[-sample,]
 train.data=drop_na(train.data)
+test.data=drop_na(test.data)
 
 fit=lm(deaths~.,data=train.data)
 vif(fit)
@@ -889,7 +893,7 @@ ncvTest(fit4)
 #diagnostic plots seem better, residuals vs fitted not totally
 #random at lower fitted values, but well spaced as this gets higher,
 #standardized residuals dont seem to follow normal distribution well
-#Points 8939, 8952 look poor on cook's plot. ncvTest results in p-value 
+#Points 2913 looks worrying on cook's distance plot. ncvTest results in p-value 
 #< 2.22e-16 implying heteroscedasticity
 
 #model 5
@@ -898,7 +902,7 @@ plot(fit5)
 ncvTest(fit5)
 #residuals vs fitted not totally random, especially on left side
 #standardized residuals dont seem to follow normal distribution well
-#cook's distance plot looks fine. ncvTest results in p-value < 2.22e-16 implying 
+#cook's distance plot looks poor regarding 8932. ncvTest results in p-value < 2.22e-16 implying 
 #heteroscedasticity
 
 #model 6
@@ -976,10 +980,10 @@ c(mean(sse1),mean(sse2),mean(sse3),mean(sse4),mean(sse5),mean(sse6),mean(sse7),m
 r2 <- rSquared(test.data$deaths, resid = test.data$deaths-predict(fit5,new=test.data)); r2
 #0.8887649
 
-#pretty great 0.8887649 R^2; not accounting for adjusted R^2 considering we
+#pretty great 0.9140345 R^2; not accounting for adjusted R^2 considering we
 #have many variables
 #adjusted R^2
 n=nrow(test.data)
 k=length(coef(fit5))-1
 1-((1-r2)*(n-1))/(n-k-1)
-#about the same,  0.8848089, this is pretty great!
+#about the same,  0.8996393, this is pretty great!
